@@ -4,6 +4,11 @@
     "slug": "cucoudle",
     "version": "1.0.0",
     "orientation": "portrait",
+    "splash": {
+      "backgroundColor": "#07111E",
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain"
+    },
     "scheme": "cucoudle",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
