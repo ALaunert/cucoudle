@@ -491,25 +491,8 @@ class Daemon:
             sid = str(params.get("sessionId", ""))
             data = str(params.get("data", ""))
             if params.get("inputMode") == "text":
-                # Deliver composer text the way a real terminal does: as an
-                # explicit paste (when the TUI enabled bracketed paste, e.g.
-                # codex/claude) plus a SEPARATE, slightly-later Enter keypress.
-                # A single "text\r" burst is read as one chunk and treated as a
-                # paste, so the Enter never submits; the gap makes the app see a
-                # discrete Return like a human pressing it.
                 submit = bool(params.get("submit")) or data.endswith(("\n", "\r"))
-                body = data.rstrip("\r\n") if submit else data
-                bp = bool(getattr(self, "_bracketed_paste", {}).get(sid))
-                if body and bp:
-                    body = "\x1b[200~" + body + "\x1b[201~"
-                self.log(f"session.input sid={sid} bracketed={bp} submit={submit} bodybytes={len(body)}")
-                try:
-                    if body:
-                        entry.pty.write(body.encode("utf-8"))
-                    if submit:
-                        self._submit_enter(entry.pty)
-                except (OSError, AttributeError) as exc:
-                    raise ProtocolException(ErrorCode.PTY_WRITE_FAILED, str(exc))
+                self._deliver_text(entry, sid, data, submit)
                 return {"accepted": True}
             try:
                 entry.pty.write(data.encode("utf-8"))
@@ -565,11 +548,9 @@ class Daemon:
 
         if rtype == "text":
             text = str(response.get("text", ""))
-            payload = text.encode("utf-8")
-            if bool(response.get("submit")):
-                payload += b"\n"
+            submit = bool(response.get("submit"))
             self._resolve_interaction(sid, "answered")
-            self._write_pty(entry, payload)
+            self._deliver_text(entry, sid, text, submit)
             return {"accepted": True}
 
         if rtype == "cancel":
@@ -597,6 +578,25 @@ class Daemon:
         if entry.pty is None or not entry.pty.running:
             raise ProtocolException(ErrorCode.SESSION_STOPPED, f"session '{sid}' is not running")
         return entry
+
+    def _deliver_text(self, entry, sid: str, data: str, submit: bool) -> None:
+        """Deliver composer text the way a real terminal does: as an explicit
+        paste (when the TUI enabled bracketed paste, e.g. codex/claude) plus a
+        SEPARATE, slightly-later Enter keypress. A single "text\\r" burst is
+        read as one chunk and treated as a paste, so the Enter never submits;
+        the gap makes the app see a discrete Return like a human pressing it."""
+        body = data.rstrip("\r\n") if submit else data
+        bp = bool(getattr(self, "_bracketed_paste", {}).get(sid))
+        if body and bp:
+            body = "\x1b[200~" + body + "\x1b[201~"
+        self.log(f"text input sid={sid} bracketed={bp} submit={submit} bodybytes={len(body)}")
+        try:
+            if body:
+                entry.pty.write(body.encode("utf-8"))
+            if submit:
+                self._submit_enter(entry.pty)
+        except (OSError, AttributeError) as exc:
+            raise ProtocolException(ErrorCode.PTY_WRITE_FAILED, str(exc))
 
     def _submit_enter(self, pty) -> None:
         """Send Enter as a discrete keypress, slightly after the text write, so a
