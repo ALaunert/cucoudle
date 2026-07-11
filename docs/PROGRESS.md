@@ -418,3 +418,16 @@
 **Решения, ограничения и проблемы:** Дек — презентационный материал, не продуктовый код. Демо-слайд — заглушка под запись к демо-дню (мобильного приложения ещё нет). Часть перечисленных на слайде «что умеет» возможностей (подтвердить/отклонить, уведомления) — целевые и в продукте пока не реализованы; фактическое проверенное состояние продукта отражено в `docs/FINAL_IMPLEMENTATION.md`. Нарратив по просьбе пользователя — demo-driven; дизайн ещё дорабатывается.
 
 **Следующий шаг:** После готовности мобильного приложения заменить демо-заглушку реальным видео/скриншотами; при необходимости адаптировать под финальный тайминг и брендинг.
+## 2026-07-11 — Pairing, Action Inbox, Sessions и application shell (Wave 2)
+
+**Цель:** Превратить mobile foundations в связанный filesystem-backed пользовательский flow от первого pairing до Inbox и списка сессий.
+
+**Сделано:** Реализованы QR/manual pairing с runtime protocol validation, CameraView/permission states, SecureStore profile repository и стабильной mobile identity. Добавлены Action Inbox с status-derived cards, exact-key dismissal и generic activity, а также Sessions с фильтрами, cwd basename и раздельными empty/reconnect/offline states. `AppProvider` восстанавливает active profile, направляет в pairing либо reconnecting tab shell и публикует state/client/repository/navigation callbacks. Все четыре tab routes и target `/session/[id]` существуют в filesystem; New/Settings/Session detail используют безопасные placeholders до Wave 3. Focused integration review выявил отсутствующие route targets и navigation dependency; gaps закрыты отдельным red→green regression test.
+
+**Затронутые компоненты:** `apps/mobile/src/pairing`, `apps/mobile/src/features/{pairing,inbox,sessions}`, `apps/mobile/src/application`, `apps/mobile/src/app`, соответствующие Jest tests, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
+
+**Проверки:** Lane reviews Pairing/Inbox/Sessions — PASS; application composition review — PASS после route/navigation regression. `npm test` — 53 core tests в 9 файлах и 77 mobile tests в 14 suites прошли. `npm run typecheck` — core и mobile прошли. `git diff --check` — успешно. `npm audit` по-прежнему завершился exit 1 с 14 moderate advisories в Expo SDK 54 dependency chain; доступное автоматическое исправление требует breaking upgrade на Expo 57.
+
+**Решения, ограничения и проблемы:** Pairing transport и все mutating callbacks выполняются один раз без automatic retry. Bootstrap с сохранённым profile намеренно входит в `reconnecting`; фактический resume/list/subscribe lifecycle принадлежит Wave 3. Four-tab placeholders нужны для реальной Expo Router composition и будут заменены TDD-экранами, а не считаются готовыми New/Settings/Session detail. Zero-vulnerability audit gate остаётся открытым из-за несовместимости предлагаемого fix с утверждённым SDK 54.
+
+**Следующий шаг:** Параллельно реализовать Wave 3 lanes: live Session detail, New/Settings и reconnect coordinator, затем capability-gated structured action zone и общий integration checkpoint.
