@@ -3,6 +3,7 @@
     "name": "Cucoudle",
     "slug": "cucoudle",
     "version": "1.0.0",
+    "backgroundColor": "#07111E",
     "orientation": "portrait",
     "splash": {
       "backgroundColor": "#07111E",
