@@ -76,7 +76,7 @@ export function PlainTerminal({ text }: PlainTerminalProps) {
 const styles = StyleSheet.create({
   terminal: {
     flex: 1,
-    minHeight: 180,
+    minHeight: 0,
     borderRadius: radii.card,
     borderWidth: 1,
     borderColor: colors.border,

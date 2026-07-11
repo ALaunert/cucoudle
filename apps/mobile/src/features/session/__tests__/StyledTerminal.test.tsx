@@ -49,6 +49,8 @@ describe("StyledTerminal", () => {
     expect(flat.color).toBe("#F47067");
     expect(flat.fontWeight).toBe("700");
     expect(view.getByText(" plain")).toBeTruthy();
-    expect(view.getByTestId("styled-terminal")).toBeTruthy();
+    expect(view.getByTestId("styled-terminal").props.style).toEqual(
+      expect.objectContaining({ minHeight: 0 }),
+    );
   });
 });

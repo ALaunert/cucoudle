@@ -692,3 +692,17 @@
 **Ключевые решения/ограничения:** (A) детект по затиханию вывода (debounce 200 мс), (B) статус `waiting` на время активного промпта, (C) `cancel` = снять интеракцию без ввода, (D) `multiSelect` заложен типом, детектор отложен. Детектор рассчитан на line-oriented промпты; полный alt-screen/TUI-парсинг (напр. родной permission-промпт Claude Code) вне границ — такие состояния остаются в raw-terminal fallback. Сквозной прогон именно через Expo-приложение с настоящим CLI-агентом ещё не выполнялся (проверено техническим клиентом, юнитами и harness'ом).
 
 **Следующий шаг:** Проверить фичу через Expo-приложение на устройстве против настоящего Claude/Codex промпта; при наличии времени — Claude Code alt-screen adapter поверх ярусного детектора.
+
+## 2026-07-11 — Интерфейс сессии поднимается над системной клавиатурой
+
+**Цель:** Не допускать перекрытия terminal composer системной клавиатурой в открытой мобильной сессии, сохранив видимой шапку сессии.
+
+**Сделано:** Экран `SessionScreen` обёрнут в полноэкранный `KeyboardAvoidingView`. На iOS применяется padding-avoidance, на Android через Expo-конфигурацию включён `softwareKeyboardLayoutMode: resize`; жёсткая высота клавиатуры и device-specific offsets не используются. У `PlainTerminal` и `StyledTerminal` снят прежний минимум 180 px, поэтому при уменьшении доступной высоты терминал действительно сжимается, а action area, interrupt и composer остаются над клавиатурой даже на небольших экранах. Добавлены regression tests platform mapping, вложенности composer в keyboard-aware frame и shrinkable terminal styles.
+
+**Затронутые компоненты:** `apps/mobile/src/features/session/{SessionScreen.tsx,PlainTerminal.tsx,StyledTerminal.tsx,__tests__/SessionScreen.test.tsx,__tests__/StyledTerminal.test.tsx}`, `apps/mobile/app.json`, проектная спецификация и план, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
+
+**Проверки:** test-first цикл подтверждён: новые тесты сначала падали из-за отсутствующих `sessionKeyboardBehavior` и `session-keyboard-frame`, затем focused session suite прошёл 22/22; отдельные shrinkability assertions сначала увидели прежний `minHeight: 180`, после исправления две terminal suites прошли 26/26. Полный mobile Jest-прогон — 26 suites, 162/162; mobile TypeScript typecheck — успешно; Expo Doctor — 18/18; `git diff --check` — успешно.
+
+**Решения, ограничения и проблемы:** Keyboard avoidance локализован на экране сессии и не меняет остальные экраны. На Android не добавляется второй ручной offset поверх системного resize. Автотесты подтверждают структуру и platform mapping, но не измеряют фактический keyboard inset или анимацию на устройстве; физический iPhone/Android smoke пока не выполнен. В общем рабочем дереве параллельно находятся пользовательские splash/dependency-изменения — они не входят в этот инкремент.
+
+**Следующий шаг:** На физическом iPhone открыть живую сессию, сфокусировать «Введите команду», проверить видимость шапки и composer, сжатие терминала и восстановление высоты после закрытия клавиатуры; затем повторить на Android.

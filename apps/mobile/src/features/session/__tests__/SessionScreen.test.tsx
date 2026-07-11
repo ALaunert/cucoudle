@@ -8,7 +8,7 @@ import {
   type SessionSubscribeResult,
 } from "../../../state/sessionState";
 import { PlainTerminal, isNearTerminalEnd } from "../PlainTerminal";
-import { SessionScreen } from "../SessionScreen";
+import { SessionScreen, sessionKeyboardBehavior } from "../SessionScreen";
 import { normalizeSessionRouteId } from "../../../app/session/[id]";
 
 function session(status: Session["status"] = "running"): Session {
@@ -197,10 +197,29 @@ test("reserves an action area above the composer", () => {
   expect(screen.getByText("interaction action")).toBeVisible();
 });
 
+test.each([
+  ["ios", "padding"],
+  ["android", undefined],
+  ["web", undefined],
+] as const)("uses %s keyboard avoidance behavior", (platform, expected) => {
+  expect(sessionKeyboardBehavior(platform)).toBe(expected);
+});
+
+test("wraps the open session in a keyboard-aware frame", () => {
+  renderScreen(subscribed({ session: session(), mode: "live" }));
+
+  const frame = screen.getByTestId("session-keyboard-frame");
+  expect(frame).toBeVisible();
+  expect(frame).toContainElement(screen.getByLabelText("Команда"));
+});
+
 test("plain terminal removes ANSI/control formatting but retains readable newlines", () => {
   render(<PlainTerminal text={"\u001b[31mred\u001b[0m\u0000\nnext\r\nline"} />);
 
   expect(screen.getByText("red\nnext\nline")).toBeVisible();
+  expect(screen.getByTestId("plain-terminal").props.style).toEqual(
+    expect.objectContaining({ minHeight: 0 }),
+  );
   expect(screen.getByTestId("plain-terminal-text").props.style).toEqual(
     expect.arrayContaining([expect.objectContaining({ fontFamily: expect.any(String) })]),
   );

@@ -1,5 +1,13 @@
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type PlatformOSType,
+} from "react-native";
 
 import type { SessionState } from "../../state/sessionState";
 import { AppScreen } from "../../ui/components/AppScreen";
@@ -46,6 +54,24 @@ const connectionLabels: Record<SessionConnectionStatus, string> = {
   recovery: "Восстанавливаем связь",
 };
 
+export function sessionKeyboardBehavior(
+  platform: PlatformOSType,
+): "padding" | undefined {
+  return platform === "ios" ? "padding" : undefined;
+}
+
+function SessionKeyboardFrame({ children }: { children: ReactNode }) {
+  return (
+    <KeyboardAvoidingView
+      behavior={sessionKeyboardBehavior(Platform.OS)}
+      style={styles.keyboardFrame}
+      testID="session-keyboard-frame"
+    >
+      {children}
+    </KeyboardAvoidingView>
+  );
+}
+
 export function SessionScreen({
   sessionId,
   state,
@@ -74,15 +100,17 @@ export function SessionScreen({
   const session = state.sessionsById[sessionId];
   if (!session) {
     return (
-      <AppScreen testID="session-screen">
-        {backButton}
-        <View style={styles.unavailable}>
-          <EmptyState
-            description="Она завершена, удалена или ещё не загружена."
-            title="Сессия недоступна"
-          />
-        </View>
-      </AppScreen>
+      <SessionKeyboardFrame>
+        <AppScreen testID="session-screen">
+          {backButton}
+          <View style={styles.unavailable}>
+            <EmptyState
+              description="Она завершена, удалена или ещё не загружена."
+              title="Сессия недоступна"
+            />
+          </View>
+        </AppScreen>
+      </SessionKeyboardFrame>
     );
   }
 
@@ -93,84 +121,87 @@ export function SessionScreen({
   const render = state.renderBySessionId[sessionId];
 
   return (
-    <AppScreen contentStyle={styles.screen} testID="session-screen">
-      {backButton}
-      <View style={styles.header}>
-        <View style={styles.headingCopy}>
-          <Text style={styles.agent}>{session.agent}</Text>
-          <Text accessibilityRole="header" numberOfLines={1} style={styles.title}>
-            {session.title}
-          </Text>
-          <Text numberOfLines={1} style={styles.project}>
-            {projectLabel(session.cwd)}
-          </Text>
+    <SessionKeyboardFrame>
+      <AppScreen contentStyle={styles.screen} testID="session-screen">
+        {backButton}
+        <View style={styles.header}>
+          <View style={styles.headingCopy}>
+            <Text style={styles.agent}>{session.agent}</Text>
+            <Text accessibilityRole="header" numberOfLines={1} style={styles.title}>
+              {session.title}
+            </Text>
+            <Text numberOfLines={1} style={styles.project}>
+              {projectLabel(session.cwd)}
+            </Text>
+          </View>
+          <View style={styles.headerStatus}>
+            <Text style={styles.status}>{session.status}</Text>
+            <Text style={styles.connection}>{connectionLabels[connectionStatus]}</Text>
+          </View>
         </View>
-        <View style={styles.headerStatus}>
-          <Text style={styles.status}>{session.status}</Text>
-          <Text style={styles.connection}>{connectionLabels[connectionStatus]}</Text>
+
+        {hasRenderContent(render) ? (
+          <StyledTerminal buffer={render} />
+        ) : (
+          <PlainTerminal text={terminal} />
+        )}
+
+        {stopped ? (
+          <Text accessibilityLiveRegion="polite" style={styles.stopped}>
+            {session.exitCode === undefined
+              ? "Сессия завершена"
+              : `Сессия завершена (код ${session.exitCode})`}
+          </Text>
+        ) : null}
+
+        <View style={styles.actionArea} testID="session-action-area">
+          {actionArea ?? (structuredInteraction ? (
+            <StructuredActionZone
+              canMutate={connectionStatus === "online"}
+              interaction={structuredInteraction}
+              negotiatedCapabilities={negotiatedCapabilities}
+              onOpenSession={onOpenSession}
+              onRespond={onRespondInteraction}
+              sessionId={sessionId}
+            />
+          ) : null)}
         </View>
-      </View>
 
-      {hasRenderContent(render) ? (
-        <StyledTerminal buffer={render} />
-      ) : (
-        <PlainTerminal text={terminal} />
-      )}
-
-      {stopped ? (
-        <Text accessibilityLiveRegion="polite" style={styles.stopped}>
-          {session.exitCode === undefined
-            ? "Сессия завершена"
-            : `Сессия завершена (код ${session.exitCode})`}
-        </Text>
-      ) : null}
-
-      <View style={styles.actionArea} testID="session-action-area">
-        {actionArea ?? (structuredInteraction ? (
-          <StructuredActionZone
-            canMutate={connectionStatus === "online"}
-            interaction={structuredInteraction}
-            negotiatedCapabilities={negotiatedCapabilities}
-            onOpenSession={onOpenSession}
-            onRespond={onRespondInteraction}
-            sessionId={sessionId}
-          />
-        ) : null)}
-      </View>
-
-      <View style={styles.controls}>
-        {onInterrupt ? (
-          <InterruptButton
-            disabled={controlsDisabled}
-            onInterrupt={onInterrupt}
-            sessionId={sessionId}
-          />
-        ) : (
-          <InterruptButton
-            disabled
-            onInterrupt={async () => undefined}
-            sessionId={sessionId}
-          />
-        )}
-        {onSendInput ? (
-          <SessionComposer
-            disabled={controlsDisabled}
-            onSendInput={onSendInput}
-            sessionId={sessionId}
-          />
-        ) : (
-          <SessionComposer
-            disabled
-            onSendInput={async () => ({ accepted: false })}
-            sessionId={sessionId}
-          />
-        )}
-      </View>
-    </AppScreen>
+        <View style={styles.controls}>
+          {onInterrupt ? (
+            <InterruptButton
+              disabled={controlsDisabled}
+              onInterrupt={onInterrupt}
+              sessionId={sessionId}
+            />
+          ) : (
+            <InterruptButton
+              disabled
+              onInterrupt={async () => undefined}
+              sessionId={sessionId}
+            />
+          )}
+          {onSendInput ? (
+            <SessionComposer
+              disabled={controlsDisabled}
+              onSendInput={onSendInput}
+              sessionId={sessionId}
+            />
+          ) : (
+            <SessionComposer
+              disabled
+              onSendInput={async () => ({ accepted: false })}
+              sessionId={sessionId}
+            />
+          )}
+        </View>
+      </AppScreen>
+    </SessionKeyboardFrame>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardFrame: { flex: 1 },
   screen: { gap: spacing.md },
   back: { alignSelf: "flex-start" },
   backLabel: {
