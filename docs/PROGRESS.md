@@ -609,3 +609,15 @@
 **Решения и ограничения:** эмуляция на десктопе выбрана вместо xterm.js-в-WebView, чтобы мобилка осталась нативной, а проблема решалась в источнике; трафик временно дублируется (raw + render); pyte покрывает не 100% xterm-фич (для Claude Code/Codex достаточно); палитра — приближение к десктопным темам. Живой прогон с настоящим Claude на телефоне отдельной проверкой не зафиксирован.
 
 **Следующий шаг:** Прогнать демо телефон ↔ relay ↔ desktop с настоящим CLI-агентом и при необходимости докрутить палитру/типографику; затем убрать дублирование raw-потока через capability negotiation.
+
+## 2026-07-11 — Homebrew release v0.1.3
+
+**Цель:** Опубликовать desktop terminal-cleanup fix как обычное Homebrew-обновление.
+
+**Сделано:** Коммит `6a6ed58` опубликован в `main`, создан и отправлен tag `v0.1.3`; formula переведена на tag tarball с SHA256 `473a55ebcda10bd71facbfecf3f089024f63bff246787412077ba1e317c19116`. Formula дополнена Sorbet sigil и class documentation для чистого Homebrew lint.
+
+**Проверки:** Чистый Python 3.13 venv успешно собрал `cucoudle-desktop==0.1.3`; desktop pytest 55/55, compileall и diff check прошли. Homebrew tap видит upgrade `0.1.2 → 0.1.3`, `brew fetch` скачал formula и resources, `brew style` и `brew audit alaunert/cucoudle/cucoudle` проходят без замечаний.
+
+**Решения, ограничения и проблемы:** Локальный `brew upgrade` не запущен во время активной managed Codex-сессии, поскольку service restart оборвёт её in-memory PTY. Это не блокирует публичный release.
+
+**Следующий шаг:** После завершения активного Codex выполнить `brew upgrade cucoudle && cucoudle install`, затем повторить controlled daemon-restart smoke.
