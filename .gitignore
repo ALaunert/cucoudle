@@ -62,3 +62,6 @@ build/
 
 # Superpowers plugin working directory
 .superpowers/
+
+# Local session notes not tracked in git
+docs/local/
