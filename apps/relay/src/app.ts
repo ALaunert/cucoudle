@@ -49,8 +49,9 @@ export async function startServer(
     mobileSessionTtlMs: DEFAULT_MOBILE_SESSION_TTL_MS,
     desktopResponseTimeoutMs: DEFAULT_DESKTOP_RESPONSE_TIMEOUT_MS,
   },
+  host = "0.0.0.0",
 ): Promise<FastifyInstance> {
   const app = buildApp(relayMobileUrl, options);
-  await app.listen({ port, host: "0.0.0.0" });
+  await app.listen({ port, host });
   return app;
 }

@@ -3,6 +3,10 @@
 This bundle runs the relay in Docker on loopback and exposes it through the
 server's existing Nginx and wildcard TLS certificate.
 
+For a temporary non-container process, set `HOST=127.0.0.1`. Never expose the
+relay's plain HTTP/WebSocket port directly to the internet; public traffic must
+terminate TLS in Nginx.
+
 ## Server prerequisites
 
 - an administrator account with access to Docker and `/etc/nginx`;
@@ -39,6 +43,23 @@ docker compose -f deploy/relay/compose.yaml ps
 Desktop uses `wss://relay.launert.dev`; the daemon appends
 `/v1/ws/desktop`. Mobile uses the QR-provided
 `wss://relay.launert.dev/v1/ws/mobile` URL.
+
+## User-service fallback
+
+When Docker access is unavailable, the checked-in user unit can run the relay
+on loopback. Node and dependencies must already be installed in the user's
+home directory:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp deploy/relay/cucoudle-relay.user.service ~/.config/systemd/user/cucoudle-relay.service
+systemctl --user daemon-reload
+systemctl --user enable --now cucoudle-relay.service
+```
+
+An administrator must run `loginctl enable-linger alexey` once so the user unit
+starts at boot without an interactive SSH login. Nginx installation remains the
+same as above and still requires administrator access.
 
 ## Current security boundary
 

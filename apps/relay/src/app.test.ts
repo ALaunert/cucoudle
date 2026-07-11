@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { WebSocket } from "ws";
-import { buildApp } from "./app.js";
+import { buildApp, startServer } from "./app.js";
 
 let app: FastifyInstance | undefined;
 
@@ -23,6 +23,16 @@ function once(ws: WebSocket, event: "message" | "open"): Promise<unknown> {
 }
 
 describe("relay app", () => {
+  it("can bind the standalone server to loopback only", async () => {
+    app = await startServer(0, undefined, {}, "127.0.0.1");
+    const address = app.server.address();
+    expect(address).not.toBeNull();
+    expect(typeof address).not.toBe("string");
+    if (address !== null && typeof address !== "string") {
+      expect(address.address).toBe("127.0.0.1");
+    }
+  });
+
   it("answers /healthz with 200", async () => {
     const started = await listen();
     app = started.app;

@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile.relay
     restart: unless-stopped
     environment:
+      HOST: "0.0.0.0"
       PORT: "8787"
       RELAY_MOBILE_URL: "wss://relay.launert.dev/v1/ws/mobile"
       MOBILE_SESSION_TTL_SECONDS: "28800"

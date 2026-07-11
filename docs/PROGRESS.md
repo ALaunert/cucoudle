@@ -335,3 +335,17 @@
 **Решения, ограничения и проблемы:** Harness остается отдельным test target и требует уже запущенный local relay. Production hosted relay lifecycle от этого не зависит.
 
 **Следующий шаг:** Добавить orchestration запуска relay внутрь integration test либо отдельный CI service, сохранив возможность проверки внешнего WSS endpoint.
+
+## 2026-07-11 — Безопасный запуск relay на `launert.dev`
+
+**Цель:** Развернуть серверную часть на целевом хосте и не оставлять plain HTTP/WebSocket порт доступным из интернета.
+
+**Сделано:** В standalone relay добавлен настраиваемый `HOST`; на сервере установлен Node 22 и зависимости, исходники развернуты в `/home/alexey/cucoudle`, а relay включён как user-level systemd service с `Restart=always`, production mobile URL и bind на `127.0.0.1:8787`. Добавлен проверяемый user-service fallback для окружений без Docker-доступа.
+
+**Затронутые компоненты:** `apps/relay/src/app.ts`, `server.ts`, app tests, Compose/deployment guide, user systemd unit и актуальная документация. Параллельные desktop и Homebrew изменения не затрагивались.
+
+**Проверки:** Relay app tests — 6 passed; TypeScript typecheck — успешно. На сервере `/healthz` вернул `ok`, `/readyz` — `ready`, socket слушает только `127.0.0.1:8787`; внешний запрос на порт `8787` отклонён. Публичный `https://relay.launert.dev/healthz` всё ещё возвращает Vite `403`, так как Nginx vhost не установлен.
+
+**Решения, ограничения и проблемы:** Прямой незашифрованный порт закрыт. Учётка `alexey` не имеет sudo, доступа к Docker socket и прав записи в `/etc/nginx`; кроме того, для user service установлен `Linger=no`. Поэтому процесс работает сейчас, но публичный WSS и гарантированный autostart после reboot требуют разовой административной настройки.
+
+**Следующий шаг:** Администратору применить `deploy/relay/nginx.conf`, выполнить `loginctl enable-linger alexey` (либо запустить Compose как system service), затем повторить HTTPS и desktop/mobile WebSocket smoke.

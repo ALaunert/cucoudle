@@ -1,0 +1,20 @@
+[Unit]
+Description=Cucoudle relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/cucoudle
+Environment=PATH=%h/.local/node/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOST=127.0.0.1
+Environment=PORT=8787
+Environment=RELAY_MOBILE_URL=wss://relay.launert.dev/v1/ws/mobile
+Environment=MOBILE_SESSION_TTL_SECONDS=28800
+Environment=DESKTOP_RESPONSE_TIMEOUT_MS=15000
+ExecStart=%h/.local/node/bin/npm run relay
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target
