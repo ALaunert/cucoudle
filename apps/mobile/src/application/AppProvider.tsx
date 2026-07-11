@@ -2,13 +2,9 @@ import type { PropsWithChildren } from "react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { router } from "expo-router";
 
-import type { MobileDevice, SessionInputParams } from "@cucoudle/protocol";
+import type { MobileDevice } from "@cucoudle/protocol";
 import { getOrCreateDeviceIdentity } from "../pairing/deviceIdentity";
-import type {
-  PairingProfile,
-  PairingResult,
-  PairingTransportRequest,
-} from "../pairing/pairingProfile";
+import type { PairingProfile, PairingResult, PairingTransportRequest } from "../pairing/pairingProfile";
 import {
   createPairingRepository,
   type PairingRepository,
@@ -16,11 +12,7 @@ import {
 import { createMobileClient, type MobileClient } from "../protocol/mobileClient";
 import { sessionReducer } from "../state/sessionReducer";
 import { createInitialSessionState } from "../state/sessionState";
-import type { SessionSubscribeResult } from "../state/sessionState";
-import {
-  createConnectionCoordinator,
-  type ConnectionCoordinator,
-} from "./connectionCoordinator";
+import { createMobileRuntime, type MobileRuntime } from "./createMobileRuntime";
 import {
   AppContext,
   type AppConnectionStatus,
@@ -73,10 +65,13 @@ export function AppProvider({ children, dependencies }: AppProviderProps) {
   const sessionStateRef = useRef(sessionState);
   sessionStateRef.current = sessionState;
   const exitRecoveryOnOnlineRef = useRef(false);
-  const coordinatorRef = useRef<ConnectionCoordinator | null>(null);
-  if (!coordinatorRef.current) {
-    coordinatorRef.current = createConnectionCoordinator({
+  const runtimeRef = useRef<MobileRuntime | null>(null);
+  if (!runtimeRef.current) {
+    runtimeRef.current = createMobileRuntime({
       client,
+      pairingClient,
+      profileRepository,
+      navigation,
       dispatch: (action) => {
         dispatch(action);
         if (action.type === "session/listReceived") setHasLoadedSessionList(true);
@@ -113,32 +108,12 @@ export function AppProvider({ children, dependencies }: AppProviderProps) {
       onCapabilitiesChange: setNegotiatedCapabilities,
     });
   }
-  const coordinator = coordinatorRef.current;
-  const subscribingSessionIds = useRef(new Set<string>());
-  const latestOpenSessionIdRef = useRef<string | undefined>(undefined);
+  const runtime = runtimeRef.current;
 
   const openSessionDetail = useCallback((sessionId: string) => {
-    latestOpenSessionIdRef.current = sessionId;
-    dispatch({ type: "session/opened", sessionId });
+    void runtime.openSession(sessionId);
     navigation.push(`/session/${sessionId}`);
-    if (connectionStatus !== "online" || subscribingSessionIds.current.has(sessionId)) {
-      return;
-    }
-    subscribingSessionIds.current.add(sessionId);
-    const lastSeq = sessionStateRef.current.terminalBySessionId[sessionId]?.lastSeq;
-    const params: Record<string, unknown> = {
-      sessionId,
-      ...(lastSeq === undefined ? {} : { afterSeq: lastSeq }),
-    };
-    void client
-      .request<SessionSubscribeResult>("session.subscribe", params)
-      .then((result) => {
-        if (latestOpenSessionIdRef.current !== sessionId) return;
-        dispatch({ type: "session/subscribeReceived", result });
-      })
-      .catch(() => undefined)
-      .finally(() => subscribingSessionIds.current.delete(sessionId));
-  }, [client, connectionStatus, navigation]);
+  }, [navigation, runtime]);
 
   useEffect(() => {
     let active = true;
@@ -150,7 +125,7 @@ export function AppProvider({ children, dependencies }: AppProviderProps) {
         setConnectionStatus(restored ? "reconnecting" : "idle");
         setBootstrapStatus("ready");
         navigation.replace(restored ? "/(tabs)/inbox" : "/pairing");
-        if (restored) void coordinator.start(restored);
+        if (restored) void runtime.start(restored);
       })
       .catch(() => {
         if (!active) return;
@@ -162,14 +137,13 @@ export function AppProvider({ children, dependencies }: AppProviderProps) {
     return () => {
       active = false;
     };
-  }, [coordinator, navigation, profileRepository]);
+  }, [navigation, profileRepository, runtime]);
 
   useEffect(
     () => () => {
-      coordinator.dispose();
-      pairingClient.close();
+      runtime.dispose();
     },
-    [coordinator, pairingClient],
+    [runtime],
   );
 
   const value = useMemo(
@@ -182,20 +156,10 @@ export function AppProvider({ children, dependencies }: AppProviderProps) {
       negotiatedCapabilities,
       client,
       profileRepository,
-      pairingClient,
       navigation,
       dispatch,
-      async pair(request: PairingTransportRequest): Promise<PairingResult> {
-        try {
-          await pairingClient.connect(request.relayWsUrl);
-          return await pairingClient.request<PairingResult>("mobile.pair", {
-            desktopId: request.desktopId,
-            pairingCode: request.pairingCode,
-            mobileDevice: request.mobileDevice,
-          });
-        } finally {
-          pairingClient.close();
-        }
+      pair(request: PairingTransportRequest): Promise<PairingResult> {
+        return runtime.pair(request);
       },
       saveProfile(nextProfile: PairingProfile) {
         return profileRepository.replace(nextProfile);
@@ -205,7 +169,7 @@ export function AppProvider({ children, dependencies }: AppProviderProps) {
         setProfile(nextProfile);
         setConnectionStatus("reconnecting");
         navigation.replace("/(tabs)/inbox");
-        void coordinator.start(nextProfile);
+        void runtime.start(nextProfile);
       },
       dismissAttention(key: string) {
         dispatch({ type: "attention/dismissed", key });
@@ -217,32 +181,28 @@ export function AppProvider({ children, dependencies }: AppProviderProps) {
         openSessionDetail(sessionId);
       },
       retryConnection() {
-        return coordinator.retry();
+        return runtime.retry();
       },
       pairAnotherComputer() {
         navigation.push("/pairing");
       },
       async clearPairing() {
-        await coordinator.start(null);
-        client.close();
+        await runtime.start(null);
         await profileRepository.clear();
         setProfile(null);
       },
-      sendInput(params: SessionInputParams) {
-        return client.request<{ accepted: boolean; bytesWritten?: number }>(
-          "session.input",
-          params as unknown as Record<string, unknown>,
-        );
+      sendInput(params: import("@cucoudle/protocol").SessionInputParams) {
+        return runtime.sendInput(params);
       },
       interruptSession(params: { sessionId: string }) {
-        return client.request("session.interrupt", params);
+        return runtime.interrupt(params);
       },
       respondInteraction(params: {
         sessionId: string;
         interactionId: string;
         response: import("@cucoudle/protocol").InteractionResponse;
       }) {
-        return client.request("interaction.respond", params);
+        return runtime.respondInteraction(params);
       },
     }),
     [
@@ -254,10 +214,9 @@ export function AppProvider({ children, dependencies }: AppProviderProps) {
       navigation,
       negotiatedCapabilities,
       openSessionDetail,
-      pairingClient,
       profile,
       profileRepository,
-      coordinator,
+      runtime,
       sessionState,
     ],
   );

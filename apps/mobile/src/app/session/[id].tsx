@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 
 import { useApp } from "../../application/useApp";
 import {
@@ -31,6 +31,10 @@ export default function SessionRoute() {
   return (
     <SessionScreen
       connectionStatus={connectionStatus}
+      onBack={() => {
+        if (router.canGoBack()) router.back();
+        else router.replace("/(tabs)/sessions" as never);
+      }}
       negotiatedCapabilities={app.negotiatedCapabilities}
       onInterrupt={app.interruptSession}
       onOpenSession={app.openSession}

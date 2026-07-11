@@ -32,6 +32,7 @@ Cucoudle — мобильное приложение для удалённого
 - реализованы продуктовые экраны Action Inbox и Sessions: status-derived attention cards, exact-key dismissal, generic lifecycle activity, offline/reconnecting states, active/completed filters, cwd basename и доступная навигация к session detail;
 - реализован application bootstrap/provider и reconnect coordinator: восстановление profile, `mobile.resume` → `session.list` → восстановление открытой `session.subscribe`, bounded reconnect, отдельные recovery/pairing-required состояния и запрет mutating actions вне online; повторное pairing использует изолированный transport;
 - реализованы live Session detail, New и Settings: моноширинный terminal buffer, ввод текста, interrupt, connection/recovery controls, подключение другого компьютера и очистка pairing profile;
+- мобильный runtime собран в отдельный модуль `createMobileRuntime` (connection coordinator + pairing transport + protocol-запросы), `AppProvider` — тонкий React-слой над ним; навигация список сессий → `/session/[id]` → «назад» работает, камера пейринга на iPhone Pro принудительно выбирает обычную широкоугольную линзу, а `metro.config.js` резолвит `.js`-импорты монорепо-пакетов;
 - structured approval controls включаются только при negotiated capability `interaction.structured`, требуют online-состояния и защищены от повторной отправки; без capability остаётся raw terminal/session fallback;
 - зафиксирован CLI-first MVP: desktop-daemon с shell-shims запускает CLI-агентов в PTY, relay передаёт сырой терминальный вывод на мобилу (без Claude/Codex SDK на этом этапе);
 - реализован канал десктоп↔мобила — shared-протокол и relay-брокер (срез разработчика 3):
@@ -108,7 +109,7 @@ One chat.»). Дек рассчитан на аудиторию жюри и ис
 
 ## Текущее проверенное состояние
 
-Репозиторий содержит описание продукта, проектные спецификации, рабочий production relay, desktop-daemon с PTY-мостом и shell-shims, а также Expo SDK 54 workspace с проверенной Wave 3 application composition: live terminal/session controls, structured approval gating и reconnect/recovery lifecycle. Независимо разработанные desktop и relay соединены и проверены **воспроизводимым кросс-язык harness** (`npm run test:integration`, `tests/integration/desktop-relay-smoke.ts`): настоящий Python-демон против запущенного TS relay + mobile WebSocket-клиент проходят `register`/`pairing`/`session.list`/спаун сессии/`subscribe`/`session.input`→`terminal.output`. Текущий Wave 3 gate проходит 53 core tests, 143 mobile tests и оба typecheck. Сквозной runtime smoke именно через Expo-приложение и реальный запуск на iPhone пока не подтверждены, а настоящий Claude/Codex/Cursor в интеграционном прогоне заменялся контролируемым `/bin/cat` за shim `claude`.
+Репозиторий содержит описание продукта, проектные спецификации, рабочий production relay, desktop-daemon с PTY-мостом и shell-shims, а также Expo SDK 54 workspace с проверенной Wave 3 application composition: live terminal/session controls, structured approval gating и reconnect/recovery lifecycle. Независимо разработанные desktop и relay соединены и проверены **воспроизводимым кросс-язык harness** (`npm run test:integration`, `tests/integration/desktop-relay-smoke.ts`): настоящий Python-демон против запущенного TS relay + mobile WebSocket-клиент проходят `register`/`pairing`/`session.list`/спаун сессии/`subscribe`/`session.input`→`terminal.output`. Текущий Wave 3 gate проходит 53 core tests, 145 mobile tests и оба typecheck; mobile runtime composition из Task 14 собран (`createMobileRuntime` + application-тест `mobileFlow`). Сквозной runtime smoke именно через Expo-приложение и реальный запуск на iPhone пока не подтверждены, а настоящий Claude/Codex/Cursor в интеграционном прогоне заменялся контролируемым `/bin/cat` за shim `claude`.
 
 ## Ограничения
 
@@ -132,7 +133,7 @@ One chat.»). Дек рассчитан на аудиторию жюри и ис
 
 1. TypeScript/Zod schemas для input modes и structured interactions и relay allowlist — сделано; осталось: capability offers/intersection (TS + relay) и Pydantic-зеркало на desktop.
 2. Добавить desktop key/bytes mapping и первый provider interaction adapter с stale-response protection.
-3. Завершить Task 14 mobile-плана: собрать production runtime composition, выполнить mobile flow/integration smoke, Expo doctor и запуск на физическом iPhone.
+3. Завершить Task 14 mobile-плана: production runtime composition и mobile flow test собраны; остались integration smoke, Expo doctor и подтверждённый запуск на физическом iPhone.
 4. После реализации capability negotiation включить в том же UI terminal keyboard, Approve/Reject, choices и text response с обязательным raw fallback; повторить полный E2E.
 5. Проверить настоящие Claude/Codex/Cursor prompts на macOS/Linux и iOS/Android.
 6. Добавить автоматическое desktop device enrollment и хранение credential в Keychain/Secret Service без пользовательской настройки.

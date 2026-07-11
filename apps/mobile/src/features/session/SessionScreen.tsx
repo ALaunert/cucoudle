@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { SessionState } from "../../state/sessionState";
 import { AppScreen } from "../../ui/components/AppScreen";
@@ -33,6 +33,7 @@ export type SessionScreenProps = {
   structuredInteraction?: InteractionRequest;
   onRespondInteraction?: (params: StructuredInteractionResponse) => Promise<unknown>;
   onOpenSession?: (sessionId: string) => void;
+  onBack?: () => void;
 };
 
 const connectionLabels: Record<SessionConnectionStatus, string> = {
@@ -54,11 +55,25 @@ export function SessionScreen({
   structuredInteraction,
   onRespondInteraction = async () => undefined,
   onOpenSession = () => undefined,
+  onBack,
 }: SessionScreenProps) {
+  const backButton = onBack ? (
+    <Pressable
+      accessibilityRole="button"
+      hitSlop={spacing.sm}
+      onPress={onBack}
+      style={styles.back}
+      testID="session-back"
+    >
+      <Text style={styles.backLabel}>← Сессии</Text>
+    </Pressable>
+  ) : null;
+
   const session = state.sessionsById[sessionId];
   if (!session) {
     return (
       <AppScreen testID="session-screen">
+        {backButton}
         <View style={styles.unavailable}>
           <EmptyState
             description="Она завершена, удалена или ещё не загружена."
@@ -76,6 +91,7 @@ export function SessionScreen({
 
   return (
     <AppScreen contentStyle={styles.screen} testID="session-screen">
+      {backButton}
       <View style={styles.header}>
         <View style={styles.headingCopy}>
           <Text style={styles.agent}>{session.agent}</Text>
@@ -149,6 +165,12 @@ export function SessionScreen({
 
 const styles = StyleSheet.create({
   screen: { gap: spacing.md },
+  back: { alignSelf: "flex-start" },
+  backLabel: {
+    color: colors.primary,
+    fontSize: typography.caption,
+    fontWeight: "800",
+  },
   unavailable: { flex: 1, justifyContent: "center" },
   header: {
     flexDirection: "row",

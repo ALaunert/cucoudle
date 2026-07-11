@@ -44,6 +44,8 @@ export function PairingScreen({
   onPaired,
 }: PairingScreenProps) {
   const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef<CameraView>(null);
+  const [selectedLens, setSelectedLens] = useState<string | undefined>(undefined);
   const [manual, setManual] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +75,20 @@ export function PairingScreen({
     }
   }
 
+  async function pickWideLens() {
+    try {
+      const lenses = await cameraRef.current?.getAvailableLensesAsync();
+      if (!lenses?.length) return;
+      // iPhone Pro открывает виртуальную triple-камеру в 0.5x. Имена линз
+      // локализованы системой, поэтому обычную широкоугольную выбираем как
+      // самую короткую: остальные — то же имя плюс модификатор.
+      const wide = [...lenses].sort((a, b) => a.length - b.length)[0];
+      setSelectedLens(wide);
+    } catch {
+      // Оставляем линзу по умолчанию.
+    }
+  }
+
   function scan(data: string) {
     try {
       void submit(parseQrPairingRequest(data));
@@ -96,8 +112,11 @@ export function PairingScreen({
         <View style={styles.cameraArea}>
           {permission?.granted ? (
             <CameraView
+              ref={cameraRef}
               barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
               onBarcodeScanned={loading ? undefined : ({ data }) => scan(data)}
+              onCameraReady={() => void pickWideLens()}
+              selectedLens={selectedLens}
               style={styles.camera}
             />
           ) : permission ? (

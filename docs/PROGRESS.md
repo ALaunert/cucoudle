@@ -553,3 +553,17 @@
 **Проверки:** Production JSON logs содержат полный `message.received.payload` с тестовым input/output text; `pairingCode` заменён на `<redacted>`, немаскированных pairing fields не найдено. GitHub Actions run `29152110482` завершён успешно.
 
 **Следующий шаг:** Использовать production logs для проверки живых Linux/macOS CLI-сессий; после тестов отключить payload/text logging.
+
+## 2026-07-11 — Mobile runtime composition, навигация в сессию и камера пейринга
+
+**Цель:** Собрать мобильный runtime в отдельный composable-модуль (Task 14), сделать реальный переход список → сессия → назад и починить сканирование QR на iPhone Pro.
+
+**Сделано:** Из `AppProvider` выделен `createMobileRuntime` — единая точка сборки connection coordinator, pairing-transport и protocol-запросов (`openSession`/`sendInput`/`interrupt`/`respondInteraction`/`retry`/`dispose`); provider стал тонким React-слоем над runtime. Клик по плитке в списке сессий теперь открывает `/session/[id]` (push в навигацию), на экране сессии добавлена кнопка «← Сессии» с fallback на `router.replace`, если стек пуст. В пейринге камера iPhone Pro открывалась виртуальной triple-камерой в 0.5x — добавлен выбор обычной широкоугольной линзы через `getAvailableLensesAsync`. Добавлен `apps/mobile/metro.config.js` с resolver-fallback для `.js`-импортов монорепы и `apps/mobile/.gitignore` (генерируемый `expo-env.d.ts`).
+
+**Затронутые компоненты:** `apps/mobile/src/application/{createMobileRuntime.ts,AppProvider.tsx,__tests__/mobileFlow.test.tsx}`, `apps/mobile/src/app/session/[id].tsx`, `apps/mobile/src/features/session/{SessionScreen.tsx,__tests__/SessionScreen.test.tsx}`, `apps/mobile/src/features/pairing/PairingScreen.tsx`, `apps/mobile/{metro.config.js,.gitignore,expo-env.d.ts}`.
+
+**Проверки:** `npx tsc --noEmit` — чисто; `npm test` в `apps/mobile` — 22 suites, 145 passed (включая новый application-тест `mobileFlow` и тест кнопки «назад»).
+
+**Решения, ограничения и проблемы:** Имена линз камеры локализуются системой, поэтому широкоугольная выбирается как линза с самым коротким именем — эвристика, а не API-гарантия. Полный smoke Expo-приложения на физическом iPhone отдельной автоматической проверкой не зафиксирован.
+
+**Следующий шаг:** Зафиксировать сквозной demo-прогон телефон ↔ прод-relay ↔ desktop с настоящим CLI-агентом и записать его для презентации.

@@ -133,6 +133,20 @@ test("shows an unavailable state after session.removed", () => {
   expect(screen.queryByLabelText("Команда")).toBeNull();
 });
 
+test("navigates back to the session list from the header and unavailable state", () => {
+  const onBack = jest.fn();
+  const state = subscribed({ session: session(), mode: "live" });
+  const { unmount } = renderScreen(state, { onBack });
+
+  fireEvent.press(screen.getByTestId("session-back"));
+  expect(onBack).toHaveBeenCalledTimes(1);
+  unmount();
+
+  renderScreen(createInitialSessionState(), { onBack });
+  fireEvent.press(screen.getByTestId("session-back"));
+  expect(onBack).toHaveBeenCalledTimes(2);
+});
+
 test("interrupts exactly once while pending and disables offline controls", async () => {
   let resolveInterrupt!: () => void;
   const pending = new Promise<void>((resolve) => { resolveInterrupt = resolve; });
