@@ -501,3 +501,17 @@
 **Решения, ограничения и проблемы:** Скрипт запускается из исходников через venv (у dev-машины Python 3.10, а pyproject требует 3.11 — venv обходит). Это dev-инструмент; в продукте роль скрипта играет packaged desktop (`brew install` + автозапуск). Мобильный Metro всё ещё локальный — приложение запускается отдельно через `expo start --tunnel`.
 
 **Следующий шаг:** По готовности — свести и mobile-запуск в общий скрипт/README-раздел «demo за 2 команды».
+
+## 2026-07-11 — Фикс: extensionless импорты в `@cucoudle/protocol` для Metro (разработчик 3)
+
+**Цель:** Починить сборку мобильного приложения — Metro падал `Unable to resolve "./envelope.js" from packages/protocol/src/index.ts`.
+
+**Сделано:** В `packages/protocol` относительные импорты переведены с `./x.js` на extensionless `./x` (`index.ts`, `methods.ts`, `events.ts`). Metro (React Native) не переписывает `.js`→`.ts`, в отличие от tsx/vitest/tsc, поэтому `.js`-расширения ломали бандлинг фронта; extensionless резолвится всеми потребителями. Тест-файлы (`./index.js`) не тронуты — Metro их не бандлит.
+
+**Затронутые компоненты:** `packages/protocol/src/{index,methods,events}.ts`.
+
+**Проверки:** `npx vitest run` — 53 passed; `npm run typecheck` — успешно. (Сборку Metro проверяет мобильный запуск на стороне пользователя.)
+
+**Решения, ограничения и проблемы:** Пакет по-прежнему потребляется как TS-исходники без build-шага; extensionless — совместимый общий знаменатель для Metro, esbuild/tsx и `moduleResolution: Bundler`.
+
+**Следующий шаг:** Пользователю пересобрать `npx expo start --tunnel`; при новых resolve-ошибках прислать stack.

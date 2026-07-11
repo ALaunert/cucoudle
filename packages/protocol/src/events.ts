@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SessionSchema, MobileDeviceSchema, TerminalOutputSchema } from "./sessions.js";
+import { SessionSchema, MobileDeviceSchema, TerminalOutputSchema } from "./sessions";
 
 export const DESKTOP_EVENTS = [
   "session.created",

@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { MobileDeviceSchema, SessionSchema } from "./sessions.js";
-import { EventMessageSchema } from "./envelope.js";
-import { InteractionRequestSchema } from "./events.js";
+import { MobileDeviceSchema, SessionSchema } from "./sessions";
+import { EventMessageSchema } from "./envelope";
+import { InteractionRequestSchema } from "./events";
 
 export const MOBILE_METHODS = [
   "mobile.pair",
