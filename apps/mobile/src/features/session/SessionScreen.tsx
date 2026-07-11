@@ -6,8 +6,10 @@ import { AppScreen } from "../../ui/components/AppScreen";
 import { EmptyState } from "../../ui/components/EmptyState";
 import { colors, spacing, typography } from "../../ui/theme";
 import { projectLabel } from "../sessions/SessionRow";
+import { hasRenderContent } from "../../state/renderBuffer";
 import { InterruptButton, type InterruptSession } from "./InterruptButton";
 import { PlainTerminal } from "./PlainTerminal";
+import { StyledTerminal } from "./StyledTerminal";
 import { SessionComposer, type SendSessionInput } from "./SessionComposer";
 import type { InteractionRequest } from "@cucoudle/protocol";
 import {
@@ -88,6 +90,7 @@ export function SessionScreen({
   const online = connectionStatus === "online";
   const controlsDisabled = stopped || !online;
   const terminal = state.terminalBySessionId[sessionId]?.text ?? "";
+  const render = state.renderBySessionId[sessionId];
 
   return (
     <AppScreen contentStyle={styles.screen} testID="session-screen">
@@ -108,7 +111,11 @@ export function SessionScreen({
         </View>
       </View>
 
-      <PlainTerminal text={terminal} />
+      {hasRenderContent(render) ? (
+        <StyledTerminal buffer={render} />
+      ) : (
+        <PlainTerminal text={terminal} />
+      )}
 
       {stopped ? (
         <Text accessibilityLiveRegion="polite" style={styles.stopped}>
