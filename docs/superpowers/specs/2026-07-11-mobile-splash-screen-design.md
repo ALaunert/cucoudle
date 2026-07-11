@@ -27,7 +27,7 @@ The matching background, composition, and scale prevent an obvious flash between
 
 ## Components and files
 
-- `apps/mobile/app.json` configures the Expo splash plugin and points to the repository-local splash asset.
+- `apps/mobile/app.json` configures Expo's native splash settings and points to the repository-local splash asset without adding a runtime dependency.
 - `apps/mobile/assets/` stores the copied or derived splash artwork used by native builds and the React Native loading screen.
 - `apps/mobile/src/ui/SplashScreen.tsx` owns the reusable React composition: artwork, wordmark, tagline, loading indicator, and accessibility labels.
 - `apps/mobile/src/app/index.tsx` delegates its loading presentation to `SplashScreen` and retains its current routing role.
@@ -49,10 +49,10 @@ The splash screen does not add new data loading or retry logic. Failures during 
 
 ## Testing and verification
 
-- Add a focused component test before implementation that expects the artwork, wordmark, tagline, and progress indicator.
+- Add a focused component test before implementation that expects the repository-local artwork, wordmark, tagline, and progress indicator.
 - Verify the test fails before adding the component and passes afterward.
 - Run the complete mobile Jest suite and TypeScript typecheck.
-- Validate Expo configuration resolution so the splash plugin and asset paths are accepted.
+- Validate Expo configuration resolution so the native splash settings and asset path are accepted.
 - Inspect the final asset and, where the environment permits, visually smoke-test the startup transition.
 
 ## Constraints and non-goals
