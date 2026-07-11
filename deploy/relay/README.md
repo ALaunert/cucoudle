@@ -1,65 +1,85 @@
 # Relay deployment on `relay.launert.dev`
 
-This bundle runs the relay in Docker on loopback and exposes it through the
-server's existing Nginx and wildcard TLS certificate.
+The relay is an independent production service. Its immutable Docker image,
+Compose project, release state and CI/CD lifecycle are separate from desktop
+and mobile applications. Source remains in the monorepo so all components share
+one checked wire protocol.
 
-For a temporary non-container process, set `HOST=127.0.0.1`. Never expose the
-relay's plain HTTP/WebSocket port directly to the internet; public traffic must
-terminate TLS in Nginx.
+The container is published as `ghcr.io/alaunert/cucoudle-relay:sha-<commit>`.
+Compose exposes it only on loopback; Nginx and the wildcard TLS certificate
+provide the public endpoint. Never expose the plain relay port to the internet.
 
 ## Server prerequisites
 
-- an administrator account with access to Docker and `/etc/nginx`;
-- repository checked out at `/home/alexey/cucoudle`;
+- the `alexey` deployment account in the `docker` group;
+- one-time administrator access to install the Nginx virtual host;
 - `relay.launert.dev` resolving to the server.
 
-The `alexey` account did not have sudo or Docker socket access when this setup
-was prepared. Do not put its SSH password in this repository or in compose
-environment files.
+Do not put SSH passwords, private keys or registry tokens in this repository or
+in Compose environment files.
 
-## Operator deployment
+## One-time server setup
 
-This is performed by a server administrator and repeated only for service updates. It is not part of desktop or mobile installation and is never run by end users.
-
-Run as an administrator on the server:
+Create the deployment directory and install the Nginx virtual host:
 
 ```bash
-cd /home/alexey/cucoudle
-docker compose -f deploy/relay/compose.yaml up -d --build
-cp deploy/relay/nginx.conf /etc/nginx/sites-available/cucoudle-relay
-ln -s /etc/nginx/sites-available/cucoudle-relay /etc/nginx/sites-enabled/cucoudle-relay
-nginx -t
-systemctl reload nginx
+mkdir -p /home/alexey/services/cucoudle-relay
+sudo cp deploy/relay/nginx.conf /etc/nginx/sites-available/cucoudle-relay
+sudo ln -sfn /etc/nginx/sites-available/cucoudle-relay /etc/nginx/sites-enabled/cucoudle-relay
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
-If the Nginx symlink already exists, do not recreate it. Validate the service:
+Nginx is stable infrastructure and is not rewritten on every application
+release. Routine relay updates do not require sudo.
+
+## Automated releases
+
+`.github/workflows/relay-deploy.yml` runs only when relay, protocol or relay
+deployment files change. It:
+
+1. runs tests and TypeScript typecheck;
+2. builds a Linux image and pushes an immutable commit tag to GHCR;
+3. uploads only the deployment bundle over SSH;
+4. serializes deployments with GitHub concurrency and a server lock;
+5. switches Compose to the new image;
+6. checks local health/readiness and the public TLS endpoint;
+7. restores the previous image automatically if local checks fail.
+
+Create the protected GitHub environment `relay-production` and configure these
+Actions secrets:
+
+| Secret | Value |
+| --- | --- |
+| `RELAY_SSH_HOST` | `launert.dev` |
+| `RELAY_SSH_PORT` | `22` |
+| `RELAY_SSH_USER` | `alexey` |
+| `RELAY_SSH_PRIVATE_KEY` | private half of the dedicated deployment key |
+| `RELAY_SSH_KNOWN_HOSTS` | pinned `ssh-keyscan` output for the server |
+After all secrets are present, set the repository Actions variable
+`RELAY_DEPLOY_ENABLED=true`. Until then, pushes still run relay tests but skip
+publishing and deployment, leaving the current production container untouched.
+
+The public key belongs in `/home/alexey/.ssh/authorized_keys`. Each workflow run
+uses its short-lived built-in `GITHUB_TOKEN` for both publishing and the one
+server-side image pull; no persistent registry credential is required.
+
+Manual rollback uses the same validated release path:
 
 ```bash
-curl --fail https://relay.launert.dev/healthz
-curl --fail https://relay.launert.dev/readyz
-docker compose -f deploy/relay/compose.yaml ps
+cd /home/alexey/services/cucoudle-relay
+./deploy.sh ghcr.io/alaunert/cucoudle-relay:sha-<known-good-commit>
 ```
 
 Desktop uses `wss://relay.launert.dev`; the daemon appends
 `/v1/ws/desktop`. Mobile uses the QR-provided
 `wss://relay.launert.dev/v1/ws/mobile` URL.
 
-## User-service fallback
+## Temporary user-service fallback
 
-When Docker access is unavailable, the checked-in user unit can run the relay
-on loopback. Node and dependencies must already be installed in the user's
-home directory:
-
-```bash
-mkdir -p ~/.config/systemd/user
-cp deploy/relay/cucoudle-relay.user.service ~/.config/systemd/user/cucoudle-relay.service
-systemctl --user daemon-reload
-systemctl --user enable --now cucoudle-relay.service
-```
-
-An administrator must run `loginctl enable-linger alexey` once so the user unit
-starts at boot without an interactive SSH login. Nginx installation remains the
-same as above and still requires administrator access.
+The checked-in user unit can run a bootstrap relay when Docker is unavailable.
+The first successful Compose release disables it automatically so exactly one
+process owns port `8787`.
 
 ## Current security boundary
 

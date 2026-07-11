@@ -33,7 +33,8 @@ Cucoudle — мобильное приложение для удалённого
   - канал покрыт unit-, интеграционными (включая reconnect через `mobile.resume`) и сквозным smoke-тестами (`npx vitest run` — 36 passed), проходит TypeScript typecheck и вручную проверен живым прогоном relay + fake-desktop + fake-mobile;
   - test toolchain обновлен до Vitest 3.2.7; `npm audit` подтверждает 0 известных vulnerabilities;
   - реальный Python desktop daemon проверен с настоящим relay, реальным shim/PTY и WebSocket mobile-клиентом: pairing, `session.list`, `session.subscribe`, `session.input`, `terminal.output`, `session.interrupt`, `session.ended` и presence-события прошли end-to-end;
-  - подготовлен Docker + Nginx deployment bundle для `relay.launert.dev` с loopback binding контейнера, wildcard TLS и WebSocket proxy timeouts;
+  - production relay развёрнут на `relay.launert.dev` как отдельный Docker Compose service: контейнер имеет automatic restart/healthcheck, публикуется только на loopback, а Nginx отдаёт HTTPS/WSS через wildcard TLS certificate;
+  - добавлен независимый relay release pipeline: path-filtered GitHub Actions выполняет tests/typecheck, собирает immutable GHCR image по commit SHA, обновляет отдельный Compose project через SSH, проверяет health/readiness и автоматически откатывает неуспешный релиз;
 - реализована desktop-часть — daemon с PTY-мостом и прозрачными shell-shims (срез разработчика 1):
   - Python-пакет `apps/desktop/cucoudle_desktop`; Pydantic-модели зеркалят wire-контракт `docs/protocol-contracts.md`;
   - `GenericPtySession` запускает реальный CLI (`claude`/`codex`/`agent`/`cursor`) в PTY на stdlib, стримит вывод, принимает ввод, resize и `interrupt`; дочерний процесс получает управляющий терминал, поэтому локальный Ctrl+C доходит до процесса;
@@ -67,7 +68,7 @@ Cucoudle — мобильное приложение для удалённого
 
 ### Ещё не реализовано
 
-Мобильное Expo-приложение (`apps/mobile`) пока отсутствует, поэтому канал пока проверен через технический WebSocket mobile-клиент. Для mobile согласован подробный UI-дизайн `Action Inbox`, но код экранов, WebSocket-клиент и запуск на iPhone ещё не реализованы. Расширенные `session.input` modes (`bytes`, `keys`) и structured interactions реализованы на уровне протокола: shared Zod-схемы в `@cucoudle/protocol` и relay-allowlist готовы и покрыты тестами (relay форвардит `interaction.respond` и фанит `interaction.*`). Capability negotiation (offers/`negotiatedCapabilities`) пока только специфицирована и не реализована. Ещё не сделаны: Pydantic-зеркало и key/bytes mapping + provider-детекторы на desktop, mobile offer/controls, capability negotiation в relay/desktop/mobile, tray/settings UI, SQLite persistence и production security. Relay-процесс развернут на `launert.dev` как enabled user service и безопасно слушает `127.0.0.1:8787`; локальные health/readiness checks проходят. Публичный TLS/WSS vhost ещё не подключён: доступная SSH-учетка не имеет административных прав на Nginx, поэтому `https://relay.launert.dev/healthz` пока попадает в существующий Vite-vhost и возвращает `403`.
+Мобильное Expo-приложение (`apps/mobile`) пока отсутствует, поэтому канал пока проверен через технический WebSocket mobile-клиент. Для mobile согласован подробный UI-дизайн `Action Inbox`, но код экранов, WebSocket-клиент и запуск на iPhone ещё не реализованы. Расширенные `session.input` modes (`bytes`, `keys`) и structured interactions реализованы на уровне протокола: shared Zod-схемы в `@cucoudle/protocol` и relay-allowlist готовы и покрыты тестами (relay форвардит `interaction.respond` и фанит `interaction.*`). Capability negotiation (offers/`negotiatedCapabilities`) пока только специфицирована и не реализована. Ещё не сделаны: Pydantic-зеркало и key/bytes mapping + provider-детекторы на desktop, mobile offer/controls, capability negotiation в relay/desktop/mobile, tray/settings UI, SQLite persistence и production security. Production relay доступен по `https://relay.launert.dev`/`wss://relay.launert.dev`; оба WSS route проверены реальным upgrade и protocol error response.
 
 ## Процесс разработки
 
@@ -88,9 +89,8 @@ Cucoudle — мобильное приложение для удалённого
 - мобильного UI пока нет; реальный desktop-daemon и relay проверены с техническим mobile-клиентом и управляемой PTY-сессией, но не с Expo-приложением и настоящим Claude/Codex/Cursor процессом;
 - desktop-daemon пока без tray/GUI и без персистентности сессий в SQLite между рестартами;
 - daemon autostart/login item пока не устанавливается автоматически: текущий CLI setup все еще просит один раз запустить `cucoudle daemon`;
-- relay in-memory: при рестарте pairing и `mobileSessionToken` теряются;
-- relay запущен под user-level systemd supervisor с automatic restart и loopback binding; для гарантированного старта после reboot администратор должен один раз включить lingering для `alexey` либо перевести сервис на подготовленный Docker Compose;
-- конфигурация удаленного TLS endpoint подготовлена, но не применена на сервере из-за отсутствия административных прав у SSH-учетки; до установки Nginx vhost production desktop/mobile endpoint не работает;
+- relay state остаётся in-memory: Compose переживает crash/reboot, но restart процесса сбрасывает pairing и mobile resume tokens;
+- automated deploy включается repository variable `RELAY_DEPLOY_ENABLED=true` только после добавления SSH/GHCR credentials в защищённое GitHub environment; bootstrap production container уже работает независимо от этого переключателя;
 - desktop endpoint пока не аутентифицируется device secret; end-to-end шифрование, ключи и ревокация устройств отложены;
 - запуск через Expo Go описан проектно и не подтверждён фактическим запуском на устройстве.
 - `waiting` опционален: без desktop-side определения ожидания мобильный UI не пытается угадывать его по сырому терминальному тексту;

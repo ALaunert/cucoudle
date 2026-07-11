@@ -349,3 +349,17 @@
 **Решения, ограничения и проблемы:** Прямой незашифрованный порт закрыт. Учётка `alexey` не имеет sudo, доступа к Docker socket и прав записи в `/etc/nginx`; кроме того, для user service установлен `Linger=no`. Поэтому процесс работает сейчас, но публичный WSS и гарантированный autostart после reboot требуют разовой административной настройки.
 
 **Следующий шаг:** Администратору применить `deploy/relay/nginx.conf`, выполнить `loginctl enable-linger alexey` (либо запустить Compose как system service), затем повторить HTTPS и desktop/mobile WebSocket smoke.
+
+## 2026-07-11 — Отдельный production relay и безопасный update pipeline
+
+**Цель:** Отделить серверную часть от lifecycle desktop/mobile и сделать повторяемые обновления без ручной сборки на production.
+
+**Сделано:** Relay упакован в production-only Docker image и перенесён в отдельный Compose project `/home/alexey/services/cucoudle-relay`; временный user service выключен. Nginx vhost с wildcard TLS установлен и применён. Добавлен path-filtered GitHub Actions workflow: test/typecheck, immutable GHCR tag `sha-<commit>`, SSH delivery deployment bundle, deployment lock, local health/readiness gate и rollback на предыдущий image. Runtime `tsx` перенесён в зависимости relay, поэтому image устанавливает только production dependencies.
+
+**Затронутые компоненты:** `Dockerfile.relay`, relay/package manifests, `deploy/relay/compose.yaml`, `deploy.sh`, deployment guide, `.github/workflows/relay-deploy.yml` и актуальная документация. Параллельные desktop/Homebrew файлы не затрагивались.
+
+**Проверки:** Protocol/relay suite — 53 passed; TypeScript typecheck, ShellCheck, Bash syntax, YAML parse и Compose config — успешно. Image реально собран на Linux-сервере с `npm ci --omit=dev`; container status — healthy. Публичные `/healthz` и `/readyz` отвечают успешно, `/v1/ws/mobile` и `/v1/ws/desktop` проходят WSS upgrade и возвращают ожидаемый `INVALID_MESSAGE`; прямой внешний порт `8787` закрыт.
+
+**Решения, ограничения и проблемы:** Relay остаётся в монорепозитории ради единого protocol contract, но является независимой deployable единицей. Nginx — одноразовая инфраструктурная настройка, обычные релизы выполняются без sudo. Workflow не содержит credentials: для активации production deploy нужно добавить dedicated SSH key в GitHub Environment и выставить `RELAY_DEPLOY_ENABLED=true`; GHCR использует short-lived workflow token. До активации текущий bootstrap container продолжает работать.
+
+**Следующий шаг:** Заполнить GitHub Environment secrets/variable, выполнить первый workflow deployment поверх bootstrap image и затем провести desktop daemon pairing smoke через публичный WSS.

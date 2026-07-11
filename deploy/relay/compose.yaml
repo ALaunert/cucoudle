@@ -1,8 +1,6 @@
 services:
   relay:
-    build:
-      context: ../..
-      dockerfile: Dockerfile.relay
+    image: ${RELAY_IMAGE:?RELAY_IMAGE must reference an immutable relay image}
     restart: unless-stopped
     environment:
       HOST: "0.0.0.0"
