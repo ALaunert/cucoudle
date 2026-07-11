@@ -40,8 +40,10 @@ if [ ! -x "$PY" ]; then
   echo "==> creating venv + installing daemon deps (first run only)"
   python3 -m venv "$VENV"
   "$VENV/bin/pip" install -q --upgrade pip
-  "$VENV/bin/pip" install -q "pydantic>=2.6" "websockets>=12.0" "qrcode>=7.4"
+  "$VENV/bin/pip" install -q "pydantic>=2.6" "websockets>=12.0" "qrcode>=7.4" "pyte>=0.8.2"
 fi
+# deps added after the venv was first created
+"$PY" -c "import pyte" 2>/dev/null || "$VENV/bin/pip" install -q "pyte>=0.8.2"
 
 # 2. start the daemon (logs to file so the QR stays readable)
 echo "==> starting desktop daemon"
