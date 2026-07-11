@@ -265,6 +265,16 @@ class Daemon:
         text = decoder.decode(data) if decoder else data.decode("utf-8", "replace")
         if not text:
             return
+        if "\x1b[?2004" in text:
+            # Track bracketed-paste mode so session.input can deliver text as a
+            # real paste + Enter, matching how the TUI expects submitted input.
+            bp = getattr(self, "_bracketed_paste", None)
+            if bp is None:
+                bp = self._bracketed_paste = {}
+            if "\x1b[?2004l" in text:
+                bp[sid] = False
+            if "\x1b[?2004h" in text:
+                bp[sid] = True
         seq = self.registry.record_output(sid, text)
         if seq is not None:
             self._emit("terminal.output", {"sessionId": sid, "seq": seq, "data": text})
@@ -371,13 +381,25 @@ class Daemon:
 
         if method == "session.input":
             entry = self._require_active(params)
+            sid = str(params.get("sessionId", ""))
             data = str(params.get("data", ""))
-            if params.get("inputMode") == "text" and params.get("submit") is True:
-                # A PTY Enter key is carriage return. New mobile clients send
-                # plain composer text with submit=true; keep newline-terminated
-                # legacy payloads unchanged so mixed-version clients stay safe.
-                if not data.endswith(("\r", "\n")):
-                    data += "\r"
+            if params.get("inputMode") == "text":
+                # Deliver composer text the way a real terminal does: as an
+                # explicit paste (when the TUI enabled bracketed paste, e.g.
+                # codex/claude) plus a SEPARATE Enter keypress. A single
+                # "text\r" burst is treated as a paste and never submits.
+                submit = bool(params.get("submit")) or data.endswith(("\n", "\r"))
+                body = data.rstrip("\r\n") if submit else data
+                if body and getattr(self, "_bracketed_paste", {}).get(sid):
+                    body = "\x1b[200~" + body + "\x1b[201~"
+                try:
+                    if body:
+                        entry.pty.write(body.encode("utf-8"))
+                    if submit:
+                        entry.pty.write(b"\r")
+                except (OSError, AttributeError) as exc:
+                    raise ProtocolException(ErrorCode.PTY_WRITE_FAILED, str(exc))
+                return {"accepted": True}
             try:
                 entry.pty.write(data.encode("utf-8"))
             except (OSError, AttributeError) as exc:

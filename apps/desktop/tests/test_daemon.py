@@ -2,7 +2,7 @@ import asyncio
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 
@@ -117,7 +117,7 @@ async def test_remote_input_and_interrupt(short_home):
         writer.close()
 
 
-def test_submitted_text_writes_pty_enter(tmp_path):
+def test_submitted_text_writes_body_then_enter(tmp_path):
     daemon = Daemon(_cfg(tmp_path))
     entry = daemon.registry.create("codex", "codex", [], "/tmp")
     entry.pty = Mock(running=True)
@@ -129,11 +129,12 @@ def test_submitted_text_writes_pty_enter(tmp_path):
         "submit": True,
     })
 
-    entry.pty.write.assert_called_once_with(b"continue\r")
+    # Enter is a SEPARATE keypress so a bracketed-paste TUI actually submits it.
+    assert entry.pty.write.call_args_list == [call(b"continue"), call(b"\r")]
     assert result == {"accepted": True}
 
 
-def test_submitted_legacy_newline_is_not_duplicated(tmp_path):
+def test_submitted_legacy_newline_becomes_discrete_enter(tmp_path):
     daemon = Daemon(_cfg(tmp_path))
     entry = daemon.registry.create("codex", "codex", [], "/tmp")
     entry.pty = Mock(running=True)
@@ -145,7 +146,26 @@ def test_submitted_legacy_newline_is_not_duplicated(tmp_path):
         "submit": True,
     })
 
-    entry.pty.write.assert_called_once_with(b"continue\n")
+    assert entry.pty.write.call_args_list == [call(b"continue"), call(b"\r")]
+
+
+def test_submit_wraps_text_as_paste_when_bracketed_paste_enabled(tmp_path):
+    daemon = Daemon(_cfg(tmp_path))
+    entry = daemon.registry.create("codex", "codex", [], "/tmp")
+    entry.pty = Mock(running=True)
+    daemon._bracketed_paste = {entry.session.id: True}
+
+    daemon.handle_relay_request("session.input", {
+        "sessionId": entry.session.id,
+        "inputMode": "text",
+        "data": "hello world",
+        "submit": True,
+    })
+
+    assert entry.pty.write.call_args_list == [
+        call(b"\x1b[200~hello world\x1b[201~"),
+        call(b"\r"),
+    ]
 
 
 @pytest.mark.asyncio
