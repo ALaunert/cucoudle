@@ -266,3 +266,17 @@
 **Решения, ограничения и проблемы:** URL relay и shell setup не требуют ручного редактирования файлов. Полный zero-touch install еще требует autostart daemon/login item и packaged installer; текущий CLI сообщает пользователю команду запуска daemon.
 
 **Следующий шаг:** Добавить macOS LaunchAgent и Linux systemd user service в installer, чтобы daemon стартовал автоматически после установки и входа пользователя.
+
+## 2026-07-11 — Кросс-язык интеграционный harness desktop↔relay↔mobile (разработчик 3)
+
+**Цель:** Проверить на живых сокетах, что независимо написанные Python desktop-daemon и TypeScript relay совпадают по контракту (поймать рассинхрон Zod↔Pydantic), не редактируя чужие зоны.
+
+**Сделано:** Добавлен `tests/integration/desktop-relay-smoke.ts` (запуск через `npm run test:integration`, вне `npm test`). Скрипт поднимает изолированный настоящий Python-демон (temp `CUCOUDLE_HOME`, `claude`→`/usr/bin/cat` как эхо), направляет его на уже запущенный relay, пейрит mobile WebSocket-клиент и прогоняет стадии: `desktop.register` + `pairing.create` → `mobile.pair` → `session.list` → спаун управляемой сессии по IPC HELLO → `session.subscribe` → `session.input`→`terminal.output`. Реализовано IPC-фреймингом (mirror `ipc.py`) и буферизованным ридером mobile-сообщений. README дополнен инструкцией.
+
+**Затронутые компоненты:** `tests/integration/desktop-relay-smoke.ts`, `package.json` (скрипт `test:integration`), `README.md`, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`. Код `apps/desktop` и `apps/relay` не изменялся — harness только запускает их.
+
+**Проверки:** Живой прогон против relay на `ws://localhost:8787` и настоящего демона (Python 3.10 venv с pydantic+websockets): все 7 стадий зелёные — desktop зарегистрировался, mobile спейрился, `session.list` прошёл, сессия `sess_…` создана (agent=claude, running), `subscribe` mode=live, ввод `ping-<rnd>` вернулся в `terminal.output`. Кросс-язык контракт подтверждён.
+
+**Решения, ограничения и проблемы:** Требует запущенного relay и Python с зависимостями демона; поэтому вынесено из `npm test`. `requires-python>=3.11` в pyproject, но пакет запускается и на 3.10 (3.11-only конструкций нет). Проверялся базовый demo-контракт; структурные интеракции в этом harness пока не гоняются, т.к. Pydantic-зеркало интеракций на desktop ещё не готово.
+
+**Следующий шаг:** После синхронизации Pydantic-схем интеракций расширить harness на `interaction.requested`→`interaction.respond`→`interaction.resolved`; при желании — прогон против публичного relay через `RELAY_WS`.

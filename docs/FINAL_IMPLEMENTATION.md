@@ -77,7 +77,7 @@ Cucoudle — мобильное приложение для удалённого
 
 ## Текущее проверенное состояние
 
-Репозиторий содержит описание продукта, проектные спецификации, рабочий relay и desktop-daemon с PTY-мостом и shell-shims. Независимо разработанные desktop и relay соединены и проверены полным локальным сквозным прогоном через технический mobile WebSocket-клиент. Мобильный Expo UI пока не создан, а настоящий Claude/Codex/Cursor в этом интеграционном прогоне заменялся контролируемым `/bin/cat` за shim `claude`.
+Репозиторий содержит описание продукта, проектные спецификации, рабочий relay и desktop-daemon с PTY-мостом и shell-shims. Независимо разработанные desktop и relay соединены и проверены **воспроизводимым кросс-язык harness** (`npm run test:integration`, `tests/integration/desktop-relay-smoke.ts`): настоящий Python-демон против запущенного TS relay + mobile WebSocket-клиент проходят `register`/`pairing`/`session.list`/спаун сессии/`subscribe`/`session.input`→`terminal.output`. Это подтверждает совпадение контракта Zod↔Pydantic на живых сокетах. Мобильный Expo UI пока не создан, а настоящий Claude/Codex/Cursor в этом прогоне заменялся контролируемым `/bin/cat` за shim `claude`.
 
 ## Ограничения
 
