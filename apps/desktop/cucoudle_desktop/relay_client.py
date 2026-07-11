@@ -34,6 +34,25 @@ if TYPE_CHECKING:  # pragma: no cover
     from .daemon import Daemon
 
 RECONNECT_MAX_BACKOFF = 15.0
+# Relay closes an older desktop socket with this code when a newer connection
+# registers the same desktopId ("last writer wins"). The replaced instance must
+# step down instead of reconnecting, or the two daemons ping-pong forever.
+REPLACED_CLOSE_CODE = 4001
+
+
+def _close_code(exc: Exception) -> int | None:
+    """Best-effort extraction of a WebSocket close code from an exception."""
+    for attr in ("rcvd", "sent"):
+        frame = getattr(exc, attr, None)
+        code = getattr(frame, "code", None)
+        if isinstance(code, int):
+            return code
+    code = getattr(exc, "code", None)
+    if isinstance(code, int):
+        return code
+    if str(REPLACED_CLOSE_CODE) in str(exc):
+        return REPLACED_CLOSE_CODE
+    return None
 
 
 class RelayClient:
@@ -78,6 +97,7 @@ class RelayClient:
     async def _run(self) -> None:
         backoff = 1.0
         while not self._stop:
+            superseded = False
             try:
                 async with websockets.connect(self._desktop_url, max_size=None) as ws:
                     self._ws = ws
@@ -89,11 +109,24 @@ class RelayClient:
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001 - report and retry
-                self.daemon.log(f"relay connection lost: {exc}")
+                if _close_code(exc) == REPLACED_CLOSE_CODE:
+                    superseded = True
+                else:
+                    self.daemon.log(f"relay connection lost: {exc}")
             finally:
                 self._ws = None
                 self._registered.clear()
                 self._fail_pending()
+            if superseded:
+                # Another daemon registered the same desktopId and took over.
+                # Step down (don't reconnect) so the newest instance wins cleanly.
+                self.daemon.log(
+                    f"another daemon registered desktopId {self.cfg.desktop_id}; "
+                    "stepping down to avoid a reconnect loop"
+                )
+                self._stop = True
+                self.daemon.request_stop("superseded by another daemon for this desktopId")
+                break
             if self._stop:
                 break
             await asyncio.sleep(backoff)

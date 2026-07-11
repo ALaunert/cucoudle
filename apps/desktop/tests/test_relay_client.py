@@ -14,9 +14,13 @@ class FakeDaemon:
         self.logs = []
         self.registered_called = False
         self.paired = []
+        self.stopped = False
 
     def log(self, m):
         self.logs.append(m)
+
+    def request_stop(self, reason=""):
+        self.stopped = True
 
     def handle_relay_request(self, method, params):
         if method == "session.list":
@@ -112,6 +116,39 @@ async def test_relay_register_pair_forward_and_events(tmp_path):
                 break
             await asyncio.sleep(0.05)
         assert events and events[0]["event"] == "terminal.output"
+    finally:
+        await relay.stop()
+        server.close()
+        await server.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_superseded_by_4001_steps_down_without_reconnect(tmp_path):
+    connects = 0
+
+    async def handler(ws):
+        nonlocal connects
+        connects += 1
+        # Kick the desktop like the relay does when a newer daemon takes over.
+        await ws.close(code=4001, reason="replaced by a new connection")
+
+    server = await websockets.serve(handler, "localhost", 0)
+    port = server.sockets[0].getsockname()[1]
+    cfg = Config("desk_dup", "test", "linux", "0.1.0", f"ws://localhost:{port}", home=tmp_path)
+    fake = FakeDaemon()
+    relay = RelayClient(cfg, fake)
+    await relay.start()
+    try:
+        for _ in range(60):
+            if fake.stopped:
+                break
+            await asyncio.sleep(0.05)
+        assert fake.stopped, "daemon should be asked to stop when superseded (4001)"
+        assert relay._stop is True
+        # Must NOT keep reconnecting (no ping-pong): connection count stays put.
+        first = connects
+        await asyncio.sleep(0.6)
+        assert connects == first, f"reconnected after 4001 ({connects} > {first})"
     finally:
         await relay.stop()
         server.close()

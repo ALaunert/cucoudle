@@ -74,6 +74,17 @@ class Daemon:
                 serve_task.cancel()
                 stop_task.cancel()
 
+    def request_stop(self, reason: str = "") -> None:
+        """Ask the running daemon to stop its main loop and shut down cleanly.
+
+        Called from the relay client when this instance is superseded by a newer
+        daemon for the same desktopId, so it steps down instead of ping-ponging.
+        """
+        if reason:
+            self.log(f"stopping: {reason}")
+        if self._stop_event is not None:
+            self._stop_event.set()
+
     async def shutdown(self) -> None:
         self.log("shutting down")
         for entry in self.registry.all():
