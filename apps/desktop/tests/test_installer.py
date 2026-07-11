@@ -124,6 +124,17 @@ def test_render_shim_default_shebang_is_portable():
     assert "def main" in content
 
 
+def test_rendered_shim_restores_terminal_private_modes():
+    from cucoudle_desktop.shim_template import render_shim
+
+    content = render_shim()
+    compile(content, "<cucoudle-shim>", "exec")
+    assert 'b"\\x1b[?1000l"' in content
+    assert 'b"\\x1b[?1006l"' in content
+    assert 'b"\\x1b[?2004l"' in content
+    assert "restore_terminal(stdin_fd, stdout_fd, old_attrs)" in content
+
+
 def test_resolve_interpreter_prefers_env_python3(monkeypatch):
     monkeypatch.setattr(installer.shutil, "which",
                         lambda name: "/usr/bin/python3" if name == "python3" else None)

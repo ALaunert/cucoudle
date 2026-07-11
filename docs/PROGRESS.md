@@ -581,3 +581,17 @@
 **Решения, ограничения и проблемы:** Enter формируется на desktop, поскольку именно desktop владеет PTY и знает его управляющую последовательность. Automatic retry ввода по-прежнему запрещён, чтобы команда не выполнялась дважды. Физический iPhone/Expo runtime smoke ещё не выполнен.
 
 **Следующий шаг:** Перезапустить desktop daemon и Expo-приложение, подтвердить отправку ответа в настоящих Codex/Claude сессиях с телефона и затем завершить общий Task 14 runtime smoke.
+
+## 2026-07-11 — Восстановление terminal modes после разрыва daemon
+
+**Цель:** Исключить попадание mouse-reporting последовательностей Claude/Codex TUI в shell input, если daemon перезапустился или socket аварийно закрылся.
+
+**Сделано:** Generated shim по-прежнему восстанавливает исходный `termios`, а затем гарантированно выключает DEC mouse tracking, focus reporting, bracketed paste, восстанавливает курсор и text attributes. Cleanup защищён от уже закрытого TTY. Desktop version поднята до `0.1.3`.
+
+**Затронутые компоненты:** Desktop shim template, installer regression test, desktop package version и проектная документация; relay/mobile runtime не менялись.
+
+**Проверки:** Generated shim компилируется и regression test проверяет наличие cleanup для mouse tracking, SGR mouse mode и bracketed paste. Desktop pytest и compile checks выполняются перед release.
+
+**Решения, ограничения и проблемы:** Причина воспроизведена по времени: Homebrew restart daemon в `14:23:54` оборвал активный shim. PTY-сессии пока in-memory и не переживают daemon restart; это отдельное архитектурное ограничение.
+
+**Следующий шаг:** Выпустить Homebrew `v0.1.3`, обновить shims через `cucoudle install` и повторить daemon-restart smoke с активным TUI.

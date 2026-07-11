@@ -39,6 +39,22 @@ ERROR = 0x84
 
 _HEADER = struct.Struct(">BI")
 
+# Interactive TUIs can leave DEC private modes enabled when the daemon/socket
+# disappears before the child gets a chance to perform its normal cleanup.
+TERMINAL_CLEANUP = (
+    b"\x1b[?1000l"  # basic mouse tracking
+    b"\x1b[?1002l"  # button-event mouse tracking
+    b"\x1b[?1003l"  # any-event mouse tracking
+    b"\x1b[?1004l"  # focus reporting
+    b"\x1b[?1005l"  # UTF-8 mouse coordinates
+    b"\x1b[?1006l"  # SGR mouse coordinates
+    b"\x1b[?1015l"  # urxvt mouse coordinates
+    b"\x1b[?1016l"  # pixel mouse coordinates
+    b"\x1b[?2004l"  # bracketed paste
+    b"\x1b[?25h"    # visible cursor
+    b"\x1b[0m"      # default character attributes
+)
+
 
 def home_dir():
     override = os.environ.get("CUCOUDLE_HOME")
@@ -102,6 +118,17 @@ def frame(ftype, payload=b""):
 
 def frame_json(ftype, obj):
     return frame(ftype, json.dumps(obj).encode("utf-8"))
+
+
+def restore_terminal(stdin_fd, stdout_fd, old_attrs):
+    try:
+        termios.tcsetattr(stdin_fd, termios.TCSADRAIN, old_attrs)
+    except (OSError, termios.error):
+        pass
+    try:
+        os.write(stdout_fd, TERMINAL_CLEANUP)
+    except OSError:
+        pass
 
 
 def main():
@@ -200,7 +227,7 @@ def main():
                         break
                     # READY and unknown frames are ignored.
     finally:
-        termios.tcsetattr(stdin_fd, termios.TCSADRAIN, old_attrs)
+        restore_terminal(stdin_fd, stdout_fd, old_attrs)
         try:
             sock.close()
         except OSError:

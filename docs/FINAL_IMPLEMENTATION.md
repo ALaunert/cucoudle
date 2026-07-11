@@ -52,6 +52,7 @@ Cucoudle — мобильное приложение для удалённого
   - shim'ы — самодостаточные stdlib-программы; при недоступности демона, не-tty или вложенной управляемой сессии прозрачно `exec`'ят реальный бинарь (fallback обязателен);
   - установщик обнаруживает реальные бинари (исключая каталог shim'ов), генерирует shim'ы и идемпотентно правит shell-rc маркированным PATH-блоком с бэкапом (`install`/`uninstall`/`doctor`);
   - shell integration поддерживает zsh/bash/sh и fish, а generated shims используют portable `python3` shebang и не зависят от пути временного virtualenv;
+  - при разрыве shim↔daemon shim восстанавливает `termios` и явно выключает mouse/focus/bracketed-paste terminal modes, чтобы аварийный выход из Claude/Codex TUI не превращал движения мыши в shell input;
   - desktop uninstall останавливает daemon, удаляет shims/PATH integration и опционально полностью очищает `~/.cucoudle`; self-contained purge script доступен для clean-slate тестов даже при сломанном Python environment;
   - Homebrew formula устанавливает CLI в isolated virtualenv, включает `service do` для одного LaunchAgent daemon через `brew services`, использует bottled `pydantic` и pinned qrcode/websockets resources без пользовательского Rust toolchain;
   - демон — источник правды по сессиям: Unix-сокет-мост локального терминала + control-канал, единый монотонный `seq`, буфер вывода и `session.subscribe` в режимах `live`/`replay`/`snapshot`, relay-клиент с `desktop.register`/`desktop.pairing.create` и обработкой форварднутых mobile-запросов и событий;
@@ -115,6 +116,7 @@ One chat.»). Дек рассчитан на аудиторию жюри и ис
 
 - pairing, Inbox, Sessions, live Session detail, reconnect и recovery UI готовы и покрыты component/application tests, но финальный production runtime smoke и физический iPhone smoke ещё не завершены; реальный desktop-daemon и relay пока проверены с техническим mobile-клиентом и управляемой PTY-сессией, но не с Expo-приложением и настоящим Claude/Codex/Cursor процессом;
 - desktop-daemon пока без tray/GUI и без персистентности сессий в SQLite между рестартами;
+- обновление/перезапуск daemon завершает хранящиеся в его памяти PTY-сессии; shim теперь гарантированно восстанавливает локальный terminal, но process persistence остаётся будущей задачей;
 - Homebrew install поддерживает background daemon/autostart после разовой команды `brew services start cucoudle`; generic pip/CLI install пока не устанавливает systemd user service или LaunchAgent автоматически;
 - relay state остаётся in-memory: Compose переживает crash/reboot, но restart процесса сбрасывает pairing и mobile resume tokens;
 - automated deploy активен: dedicated SSH credentials хранятся в защищённом GitHub environment, GHCR использует short-lived workflow token, а production работает на immutable image текущего commit SHA;
