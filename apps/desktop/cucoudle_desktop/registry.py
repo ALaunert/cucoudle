@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from .protocol import AgentKind, Session, SessionStatus, classify_agent, now_iso
+from .render import TerminalRenderer
 from .session import GenericPtySession
 
 # Per-session replay budget. Enough to reconstruct a screenful+ on reconnect
@@ -35,6 +36,7 @@ class OutputChunk:
 class SessionEntry:
     session: Session
     pty: GenericPtySession | None = None
+    renderer: TerminalRenderer | None = None
     buffer: deque[OutputChunk] = field(default_factory=deque)
     buffered_bytes: int = 0
 
@@ -159,33 +161,39 @@ class SessionRegistry:
         session_dict = entry.session.model_dump(exclude_none=True)
         last = entry.last_seq
 
+        view: dict
         if after_seq is None:
             # Fresh open: hand over whatever we have as a snapshot.
             if not entry.buffer:
-                return {"session": session_dict, "mode": "live"}
-            buffer_text = "".join(c.data for c in entry.buffer)
-            return {
-                "session": session_dict,
-                "mode": "snapshot",
-                "terminalBuffer": buffer_text,
-                "lastSeq": last,
-            }
-
-        earliest = entry.earliest_seq
-        if last is None or after_seq >= last:
-            return {"session": session_dict, "mode": "live"}
-        if earliest is not None and after_seq >= earliest - 1:
-            events = [
-                {"sessionId": session_id, "seq": c.seq, "data": c.data}
-                for c in entry.buffer
-                if c.seq > after_seq
-            ]
-            return {"session": session_dict, "mode": "replay", "events": events}
-        # Missed the buffer window: fall back to a snapshot.
-        buffer_text = "".join(c.data for c in entry.buffer)
-        return {
-            "session": session_dict,
-            "mode": "snapshot",
-            "terminalBuffer": buffer_text,
-            "lastSeq": last,
-        }
+                view = {"session": session_dict, "mode": "live"}
+            else:
+                buffer_text = "".join(c.data for c in entry.buffer)
+                view = {
+                    "session": session_dict,
+                    "mode": "snapshot",
+                    "terminalBuffer": buffer_text,
+                    "lastSeq": last,
+                }
+        else:
+            earliest = entry.earliest_seq
+            if last is None or after_seq >= last:
+                view = {"session": session_dict, "mode": "live"}
+            elif earliest is not None and after_seq >= earliest - 1:
+                events = [
+                    {"sessionId": session_id, "seq": c.seq, "data": c.data}
+                    for c in entry.buffer
+                    if c.seq > after_seq
+                ]
+                view = {"session": session_dict, "mode": "replay", "events": events}
+            else:
+                # Missed the buffer window: fall back to a snapshot.
+                buffer_text = "".join(c.data for c in entry.buffer)
+                view = {
+                    "session": session_dict,
+                    "mode": "snapshot",
+                    "terminalBuffer": buffer_text,
+                    "lastSeq": last,
+                }
+        if entry.renderer is not None:
+            view["terminalRender"] = entry.renderer.snapshot()
+        return view

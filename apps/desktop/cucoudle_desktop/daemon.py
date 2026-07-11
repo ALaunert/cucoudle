@@ -29,7 +29,12 @@ from . import ipc
 from .protocol import ErrorCode, ProtocolException
 from .registry import SessionRegistry
 from .relay_client import RelayClient
+from .render import TerminalRenderer
 from .session import GenericPtySession
+
+# Coalesce terminal.render frames: TUI spinners redraw far more often than a
+# phone can usefully repaint, so batch PTY output into ~20fps frames.
+RENDER_FLUSH_DELAY = 0.05
 
 
 class DaemonAlreadyRunning(RuntimeError):
@@ -44,6 +49,7 @@ class Daemon:
         self._server: asyncio.AbstractServer | None = None
         self._shim_writers: dict[str, asyncio.StreamWriter] = {}
         self._decoders: dict[str, codecs.IncrementalDecoder] = {}
+        self._render_pending: set[str] = set()
         self.paired_devices: list[dict] = []
         self._log_fh = None
         self._stop_event: asyncio.Event | None = None
@@ -167,6 +173,7 @@ class Daemon:
             return
 
         entry = self.registry.create(tool=tool, command=tool, argv=argv, cwd=cwd)
+        entry.renderer = TerminalRenderer(cols=cols, rows=rows)
         sid = entry.session.id
         env[MANAGED_ENV_FLAG] = "1"
         env[SESSION_ENV_VAR] = sid
@@ -219,7 +226,10 @@ class Daemon:
                         break
                 elif frame.type == ipc.RESIZE:
                     d = frame.json()
-                    pty.resize(int(d.get("cols", cols)), int(d.get("rows", rows)))
+                    new_cols, new_rows = int(d.get("cols", cols)), int(d.get("rows", rows))
+                    pty.resize(new_cols, new_rows)
+                    if entry.renderer is not None:
+                        entry.renderer.resize(new_cols, new_rows)
                 elif frame.type == ipc.STDIN_EOF:
                     pass  # local stdin closed; keep session for remote control
         finally:
@@ -258,8 +268,30 @@ class Daemon:
         seq = self.registry.record_output(sid, text)
         if seq is not None:
             self._emit("terminal.output", {"sessionId": sid, "seq": seq, "data": text})
+        entry = self.registry.get(sid)
+        if entry is not None and entry.renderer is not None:
+            entry.renderer.feed(data)
+            self._schedule_render(sid)
+
+    def _schedule_render(self, sid: str) -> None:
+        if sid in self._render_pending:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:  # pragma: no cover - tests call sync
+            return
+        self._render_pending.add(sid)
+        loop.call_later(RENDER_FLUSH_DELAY, self._flush_render, sid)
+
+    def _flush_render(self, sid: str) -> None:
+        self._render_pending.discard(sid)
+        entry = self.registry.get(sid)
+        if entry is None or entry.renderer is None:
+            return
+        self._emit("terminal.render", entry.renderer.take_frame(sid))
 
     def _on_exit(self, sid: str, code: int | None) -> None:
+        self._flush_render(sid)  # final frame so mobile sees the last output
         self.registry.mark_ended(sid, code)
         writer = self._shim_writers.get(sid)
         if writer is not None:
@@ -359,7 +391,10 @@ class Daemon:
 
         if method == "terminal.resize":
             entry = self._require_active(params)
-            entry.pty.resize(int(params.get("cols", 80)), int(params.get("rows", 24)))
+            cols, rows = int(params.get("cols", 80)), int(params.get("rows", 24))
+            entry.pty.resize(cols, rows)
+            if entry.renderer is not None:
+                entry.renderer.resize(cols, rows)
             return {"accepted": True}
 
         raise ProtocolException(ErrorCode.UNSUPPORTED_METHOD, f"unknown method '{method}'")
