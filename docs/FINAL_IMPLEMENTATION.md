@@ -59,7 +59,7 @@ Cucoudle — мобильное приложение для удалённого
 
 ### Ещё не реализовано
 
-Мобильное Expo-приложение (`apps/mobile`) пока отсутствует, поэтому канал пока проверен через технический WebSocket mobile-клиент. Расширенные input modes, structured interactions и capability negotiation пока только специфицированы: shared Zod/Pydantic schemas, desktop offer/mappings/detectors, relay intersection/allowlists и mobile offer/controls еще не реализованы. Также не сделаны tray/settings UI, SQLite persistence и production security. Deployment bundle подготовлен, но не активирован: доступная SSH-учетка не имеет административных прав на Docker и Nginx.
+Мобильное Expo-приложение (`apps/mobile`) пока отсутствует, поэтому канал пока проверен через технический WebSocket mobile-клиент. Расширенные `session.input` modes (`bytes`, `keys`) и structured interactions реализованы на уровне протокола: shared Zod-схемы в `@cucoudle/protocol` и relay-allowlist готовы и покрыты тестами (relay форвардит `interaction.respond` и фанит `interaction.*`). Capability negotiation (offers/`negotiatedCapabilities`) пока только специфицирована и не реализована. Ещё не сделаны: Pydantic-зеркало и key/bytes mapping + provider-детекторы на desktop, mobile offer/controls, capability negotiation в relay/desktop/mobile, tray/settings UI, SQLite persistence и production security. Deployment bundle подготовлен, но не активирован: доступная SSH-учетка не имеет административных прав на Docker и Nginx.
 
 ## Процесс разработки
 
@@ -88,7 +88,7 @@ Cucoudle — мобильное приложение для удалённого
 
 ## Следующие шаги
 
-1. Реализовать additive protocol schemas и capability offers в TypeScript/Pydantic, затем обновить relay intersection/allowlists.
+1. TypeScript/Zod schemas для input modes и structured interactions и relay allowlist — сделано; осталось: capability offers/intersection (TS + relay) и Pydantic-зеркало на desktop.
 2. Добавить desktop key/bytes mapping и первый provider interaction adapter с stale-response protection.
 3. Реализовать в Expo terminal keyboard, Approve/Reject, choices, text response и raw fallback; повторить полный E2E.
 4. Проверить настоящие Claude/Codex/Cursor prompts на macOS/Linux и iOS/Android.

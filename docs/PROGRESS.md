@@ -211,3 +211,17 @@
 **Решения, ограничения и проблемы:** Feature availability определяется пересечением mobile, relay и desktop, а не только общей protocol version. Negotiated set хранится per mobile connection. Текущий runtime остается baseline-only до отдельной реализации schemas, relay negotiation/allowlists, desktop mappings и mobile controls. Непубликованный mobile-код другого разработчика проверить из этой рабочей копии невозможно.
 
 **Следующий шаг:** Сначала реализовать capability negotiation и shared schemas у backend owner, затем передать mobile owner точный generated contract и только после этого включать interaction UI.
+
+## 2026-07-11 — Реализация схем интеракций и режимов ввода в `packages/protocol` (разработчик 3)
+
+**Цель:** Догнать `packages/protocol` (TS/Zod) и relay-allowlist под расширенный контракт `docs/protocol-contracts.md` (structured interactions + полный `session.input`), оставаясь строго в своей зоне.
+
+**Сделано:** В `packages/protocol` добавлены Zod-схемы: `SessionInputParams` как discriminated union `text`(+`submit?`)/`raw`/`bytes`(base64)/`keys` с `TerminalKeyStroke`/`TerminalModifier`/`TerminalKeyName`; `SessionInputResult` с `bytesWritten?`; структурные интеракции — `InteractionRequest`, `InteractionOption`, `InteractionKind`, `InteractionOptionIntent`, `InteractionResponse`, `InteractionRespondParams`, данные событий `interaction.requested/updated/resolved`; `activeInteraction?` в `SessionSubscribeResult`; error codes `INTERACTION_NOT_FOUND`/`INTERACTION_STALE`; метод `interaction.respond` добавлен в `MOBILE_METHODS` и `MOBILE_FORWARDED_METHODS`, события интеракций — в `DESKTOP_EVENTS`. Relay форвардит `interaction.respond` и фанит `interaction.*` автоматически (берёт из констант протокола) — добавлен relay-тест на это. Fake-desktop/fake-mobile расширены демонстрацией approval-промпта, чтобы поток интеракций тестировался руками без UI.
+
+**Затронутые компоненты:** `packages/protocol/src/{envelope,methods,events}.ts`, `packages/protocol/src/interactions.test.ts`, `apps/relay/src/interactions.test.ts`, `apps/relay/scripts/fake-{desktop,mobile}.ts`, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
+
+**Проверки:** `npx vitest run` — 52 passed (9 файлов); `npm run typecheck` — успешно. Живой прогон relay + fake-desktop + fake-mobile: `interaction.requested` дошёл до mobile, ответ `interaction.respond` (`approve_once`) проброшен на desktop, вернулся `interaction.resolved: answered`. Backward compatibility `text`/`raw` сохранена.
+
+**Решения, ограничения и проблемы:** Реализована только протокольная (TS/Zod) сторона + relay allowlist. Pydantic-зеркало на desktop, key/bytes mapping и provider-детекторы интеракций (desktop), а также mobile UI-контролы — вне этой зоны и пока не сделаны. Relay не интерпретирует содержимое интеракций, только форвардит.
+
+**Следующий шаг:** Синхронизировать Pydantic-модели desktop с новыми схемами (через договорённость с разработчиком 1); подготовить сквозной интеграционный harness под interaction-флоу.
