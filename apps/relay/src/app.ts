@@ -46,6 +46,7 @@ export function buildApp(
         data.toString(),
         relayMobileUrl,
         auditLog,
+        options.logInputText === true,
       ));
       socket.on("close", () => onDesktopClose(state, socket, auditLog));
     });

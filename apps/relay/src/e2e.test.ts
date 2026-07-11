@@ -117,6 +117,15 @@ describe("minimum demo contract end to end", () => {
         inputText: "continue\n",
       }),
     });
+    expect(auditEntries).toContainEqual({
+      event: "desktop.event.forwarded",
+      fields: expect.objectContaining({
+        desktopId: "desk_1",
+        eventName: "terminal.output",
+        sessionId: "sess_1",
+        outputText: "Running tests...\r\n",
+      }),
+    });
     expect(JSON.stringify(auditEntries)).not.toContain(code);
 
     desktop.close();

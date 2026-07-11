@@ -33,6 +33,7 @@ export function handleDesktopMessage(
   raw: string,
   relayMobileUrl: string,
   auditLog: RelayAuditLogger = NOOP_AUDIT_LOGGER,
+  logTerminalText = false,
 ): void {
   const parsed = parseWireMessage(raw);
   if (!parsed.ok) {
@@ -99,6 +100,7 @@ export function handleDesktopMessage(
       sessionId: sessionIdFrom(msg.data),
       mobileCount: mobiles.length,
       messageBytes: Buffer.byteLength(raw),
+      outputText: terminalOutputTextFrom(msg.event, msg.data, logTerminalText),
     });
     for (const mobile of mobiles) {
       send(mobile.socket, msg);
@@ -302,4 +304,9 @@ function inputTextFrom(method: string, params: unknown, enabled: boolean): strin
     return params.response.text;
   }
   return undefined;
+}
+
+function terminalOutputTextFrom(event: string, data: unknown, enabled: boolean): string | undefined {
+  if (!enabled || event !== "terminal.output" || typeof data !== "object" || data === null) return undefined;
+  return "data" in data && typeof data.data === "string" ? data.data : undefined;
 }

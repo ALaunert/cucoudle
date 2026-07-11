@@ -488,6 +488,20 @@
 
 **Следующий шаг:** Опубликовать formula fix; пользователям установленного stable `0.1.0` потребуется `brew update && brew upgrade cucoudle`, после чего достаточно одной команды `brew services start cucoudle`.
 
+## 2026-07-11 — Текст PTY output в тестовых relay logs
+
+**Цель:** Искать в production test logs локальные terminal prompts и ответы агентов с macOS/Linux, а не только mobile `session.input`.
+
+**Сделано:** При включённом `RELAY_LOG_INPUT_TEXT=true` audit entry `desktop.event.forwarded` для `terminal.output` теперь содержит `outputText`. Остальные desktop events и выключенный режим не получают payload. Deployment guide и актуальная документация синхронизированы.
+
+**Затронутые компоненты:** Relay app/handlers/E2E test и документация; desktop/mobile runtime не менялся.
+
+**Проверки:** Relay E2E требует точный `outputText` для PTY frame и продолжает проверять, что pairing code отсутствует во всех audit entries.
+
+**Решения, ограничения и проблемы:** Режим намеренно тестовый: PTY output включает локальный ввод, ответы агента и потенциально чувствительные данные. После завершения диагностики `RELAY_LOG_INPUT_TEXT` должен быть выключен.
+
+**Следующий шаг:** Развернуть relay, повторить Linux-диалог `привет`/`тест` и найти обе стороны разговора по `desktopId`/`sessionId`.
+
 ## 2026-07-11 — Одна команда для локального desktop-демо (разработчик 3)
 
 **Цель:** Убрать ручную возню с venv/PYTHONPATH/шимами при демонстрации: одна команда поднимает desktop-сторону, готовую к паре с телефоном через прод-relay.

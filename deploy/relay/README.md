@@ -78,9 +78,9 @@ routing metadata (`desktopId`, `mobileDeviceId`, method/event, request/session
 IDs, byte counts and result). Pairing codes and tokens are never logged.
 
 `RELAY_LOG_INPUT_TEXT=true` additionally records text from `session.input` and
-`interaction.respond` as `inputText`. It is enabled in the current test
-deployment and must be disabled for normal production where terminal text is
-sensitive.
+`interaction.respond` as `inputText`, and `terminal.output` as `outputText`. It
+is enabled in the current test deployment and must be disabled for normal
+production where terminal text is sensitive.
 
 ```bash
 docker logs --since 10m cucoudle-relay-relay-1
