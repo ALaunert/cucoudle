@@ -38,3 +38,15 @@ PAIRING_CODE=<code> npm run fake:mobile -w @cucoudle/relay  # терминал 3
 ```
 
 Fake-mobile пейрится, получает список сессий, стримит вывод терминала и отправляет ввод обратно в fake-desktop.
+
+### Сквозной кросс-язык smoke: настоящий desktop-daemon ↔ relay ↔ mobile
+
+Проверяет, что реальный Python desktop-daemon и TS relay совпадают по контракту на живых сокетах (ловит рассинхрон Zod↔Pydantic). Нужен уже запущенный relay и Python с `pydantic`+`websockets`.
+
+```bash
+# в одном терминале: npm run relay
+pip install -e apps/desktop            # или venv с pydantic+websockets
+CUCOUDLE_PY=python3 RELAY_WS=ws://localhost:8787 npm run test:integration
+```
+
+Скрипт поднимает изолированный daemon (в temp `CUCOUDLE_HOME`, `claude`→`/usr/bin/cat` как эхо), пейрит mobile-клиент через relay и прогоняет `session.list` → спаун сессии → `subscribe` → `session.input`→`terminal.output`. Не входит в `npm test` (нужны Python и живой relay).

@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "relay": "npm run start -w @cucoudle/relay",
+    "test:integration": "tsx tests/integration/desktop-relay-smoke.ts",
     "typecheck": "tsc -p tsconfig.base.json --noEmit"
   },
   "devDependencies": {
