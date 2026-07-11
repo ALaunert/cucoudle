@@ -6,6 +6,7 @@ install with:
 
 ```bash
 brew tap alaunert/cucoudle https://github.com/ALaunert/cucoudle
+brew trust alaunert/cucoudle   # Homebrew 6 requires trusting third-party taps once
 brew install cucoudle
 cucoudle install               # shims + PATH integration for your shell
 brew services start cucoudle   # run the daemon in the background (autostart)
@@ -39,6 +40,7 @@ repo `ALaunert/homebrew-cucoudle` and copy `HomebrewFormula/cucoudle.rb` into it
 
 ```bash
 brew tap ALaunert/cucoudle
+brew trust ALaunert/cucoudle
 brew install cucoudle
 ```
 
