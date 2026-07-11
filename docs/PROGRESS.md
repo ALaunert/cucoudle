@@ -321,3 +321,17 @@
 **Решения, ограничения и проблемы:** User-facing uninstall касается только desktop-клиента. Hosted production relay принципиально не останавливается и не удаляется этой командой; `--with-relay` в purge script предназначен только для локальной development среды.
 
 **Следующий шаг:** Добавить автоматический daemon autostart и packaged installer, сохранив полный cleanup path.
+
+## 2026-07-11 — Надежный выбор Python в integration harness
+
+**Цель:** Устранить environment-dependent падение cross-language smoke после объединения desktop/relay изменений.
+
+**Сделано:** Harness теперь автоматически использует `apps/desktop/.venv/bin/python`, если venv существует, поддерживает явный `CUCOUDLE_PY` override и до запуска daemon проверяет наличие `pydantic`/`websockets` с actionable prerequisite error.
+
+**Затронутые компоненты:** `tests/integration/desktop-relay-smoke.ts`, root README и журнал прогресса.
+
+**Проверки:** `npm run test:integration` успешно прошел все 7 стадий на реальном Python daemon, TS relay и mobile WebSocket client. Перед этим unit gates: desktop 49 passed, protocol/relay 52 passed, TypeScript typecheck успешно.
+
+**Решения, ограничения и проблемы:** Harness остается отдельным test target и требует уже запущенный local relay. Production hosted relay lifecycle от этого не зависит.
+
+**Следующий шаг:** Добавить orchestration запуска relay внутрь integration test либо отдельный CI service, сохранив возможность проверки внешнего WSS endpoint.

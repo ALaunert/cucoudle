@@ -49,8 +49,10 @@ Fake-mobile пейрится, получает список сессий, стр
 
 ```bash
 # в одном терминале: npm run relay
-pip install -e apps/desktop            # или venv с pydantic+websockets
-CUCOUDLE_PY=python3 RELAY_WS=ws://localhost:8787 npm run test:integration
+apps/desktop/.venv/bin/pip install -e apps/desktop  # один раз
+RELAY_WS=ws://localhost:8787 npm run test:integration
 ```
+
+Harness автоматически использует `apps/desktop/.venv/bin/python`. Для другого подготовленного интерпретатора задайте `CUCOUDLE_PY`.
 
 Скрипт поднимает изолированный daemon (в temp `CUCOUDLE_HOME`, `claude`→`/usr/bin/cat` как эхо), пейрит mobile-клиент через relay и прогоняет `session.list` → спаун сессии → `subscribe` → `session.input`→`terminal.output`. Не входит в `npm test` (нужны Python и живой relay).

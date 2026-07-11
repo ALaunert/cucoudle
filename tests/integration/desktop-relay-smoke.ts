@@ -6,16 +6,17 @@
  * TypeScript/Zod protocol and the desktop's Pydantic models.
  *
  * Run (against an already-running relay):
- *   CUCOUDLE_PY=/path/to/python RELAY_WS=ws://localhost:8787 npx tsx tests/integration/desktop-relay-smoke.ts
+ *   RELAY_WS=ws://localhost:8787 npx tsx tests/integration/desktop-relay-smoke.ts
  *
  * Env:
  *   RELAY_WS     base relay ws URL (default ws://localhost:8787) — must already be running
- *   CUCOUDLE_PY  python interpreter with pydantic+websockets installed (default python3)
+ *   CUCOUDLE_PY  optional Python override with pydantic+websockets installed;
+ *                defaults to apps/desktop/.venv/bin/python when present, then python3
  *
  * Requires the desktop package importable: PYTHONPATH is set to apps/desktop automatically.
  * Not part of `npm test` — it needs Python and a live relay.
  */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import net from "node:net";
 import fs from "node:fs";
 import path from "node:path";
@@ -24,7 +25,8 @@ import { WebSocket } from "ws";
 
 const REPO = path.resolve(import.meta.dirname, "../..");
 const RELAY_BASE = process.env.RELAY_WS ?? "ws://localhost:8787";
-const PY = process.env.CUCOUDLE_PY ?? "python3";
+const DESKTOP_VENV_PY = path.join(REPO, "apps/desktop/.venv/bin/python");
+const PY = process.env.CUCOUDLE_PY ?? (fs.existsSync(DESKTOP_VENV_PY) ? DESKTOP_VENV_PY : "python3");
 const CAT = process.env.CUCOUDLE_ECHO_BIN ?? "/usr/bin/cat";
 
 const HOME = fs.mkdtempSync(path.join(os.tmpdir(), "cucoudle-it-"));
@@ -98,6 +100,14 @@ function mReq(ws: WebSocket, method: string, id: string, params: Record<string, 
 }
 
 async function main() {
+  const pythonCheck = spawnSync(PY, ["-c", "import pydantic, websockets"], { encoding: "utf8" });
+  if (pythonCheck.status !== 0) {
+    fail(
+      `Python interpreter ${PY} is missing desktop dependencies. ` +
+      `Run apps/desktop/.venv/bin/pip install -e 'apps/desktop[dev]' ` +
+      `or set CUCOUDLE_PY to a prepared interpreter.`,
+    );
+  }
   fs.writeFileSync(path.join(HOME, "config.json"), JSON.stringify({
     desktopId: DESKTOP_ID, desktopName: "IT Desktop", platform: "linux", appVersion: "0.1.0",
     relayUrl: RELAY_BASE, realBinaries: { claude: CAT },
