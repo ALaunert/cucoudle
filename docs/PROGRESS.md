@@ -252,3 +252,17 @@
 **Решения, ограничения и проблемы:** SSH login/password не являются runtime credentials и не помещаются в приложение. Desktop знает публичный WSS endpoint без действий пользователя. Отдельная desktop device-secret authentication пока не реализована; она должна генерироваться/получаться автоматически и храниться в Keychain/Secret Service, а не запрашиваться у пользователя. Сам endpoint станет доступен только после административного применения подготовленного deployment bundle на сервере.
 
 **Следующий шаг:** Backend owner реализует автоматическое device enrollment/credential storage без ручного ввода, затем администратор активирует `relay.launert.dev` за Nginx TLS.
+
+## 2026-07-11 — Portable shell integration для простой установки
+
+**Цель:** Сохранить параллельные desktop-улучшения, уменьшающие ручную настройку shell integration на macOS/Linux.
+
+**Сделано:** Installer теперь поддерживает POSIX shell configs и fish с корректным синтаксисом, создает отсутствующие parent directories, диагностирует login shell/interpreter и генерирует shims с portable `/usr/bin/env python3` при доступном Python. CLI install/doctor выводит конкретные следующие шаги и fallback guarantees.
+
+**Затронутые компоненты:** `apps/desktop/cucoudle_desktop/installer.py`, `shim_template.py`, `cli.py`, installer tests и актуальная документация. Изменения были подготовлены параллельным desktop-агентом и сохранены отдельным commit от production relay endpoint.
+
+**Проверки:** Полный desktop suite — 47 passed; installer coverage включает portable/fallback interpreter и fish install/uninstall.
+
+**Решения, ограничения и проблемы:** URL relay и shell setup не требуют ручного редактирования файлов. Полный zero-touch install еще требует autostart daemon/login item и packaged installer; текущий CLI сообщает пользователю команду запуска daemon.
+
+**Следующий шаг:** Добавить macOS LaunchAgent и Linux systemd user service в installer, чтобы daemon стартовал автоматически после установки и входа пользователя.

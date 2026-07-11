@@ -1,5 +1,6 @@
 import os
 import stat
+import sys
 from pathlib import Path
 
 from cucoudle_desktop import installer
@@ -111,3 +112,59 @@ def test_install_uninstall_roundtrip(tmp_path, monkeypatch):
     installer.uninstall(cfg)
     assert BLOCK_START not in (fake_home / ".zshrc").read_text()
     assert not (cfg.bin_dir / "claude").exists()
+
+
+def test_render_shim_default_shebang_is_portable():
+    from cucoudle_desktop.shim_template import render_shim
+
+    content = render_shim()
+    assert content.startswith("#!/usr/bin/env python3\n")
+    # still stdlib-only body
+    assert "import websockets" not in content
+    assert "def main" in content
+
+
+def test_resolve_interpreter_prefers_env_python3(monkeypatch):
+    monkeypatch.setattr(installer.shutil, "which",
+                        lambda name: "/usr/bin/python3" if name == "python3" else None)
+    assert installer.resolve_shim_interpreter() == "/usr/bin/env python3"
+
+
+def test_resolve_interpreter_falls_back_to_current(monkeypatch):
+    monkeypatch.setattr(installer.shutil, "which", lambda name: None)
+    assert installer.resolve_shim_interpreter() == sys.executable
+
+
+def test_path_block_fish_syntax(tmp_path):
+    cfg = _cfg(tmp_path)
+    block = installer.path_block(cfg.bin_dir, "fish")
+    assert "set -gx PATH" in block
+    assert str(cfg.bin_dir) in block
+    assert "export PATH" not in block
+
+
+def test_fish_install_uses_fish_config(tmp_path, monkeypatch):
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+    monkeypatch.setenv("SHELL", "/opt/homebrew/bin/fish")
+
+    tools_dir = tmp_path / "realbin"
+    tools_dir.mkdir()
+    (tools_dir / "codex").write_text("#!/bin/sh\n")
+    (tools_dir / "codex").chmod(0o755)
+    monkeypatch.setenv("PATH", str(tools_dir))
+
+    cfg = _cfg(fake_home / ".cucoudle")
+    installer.install(cfg, python_executable="/usr/bin/python3")
+
+    fish_cfg = fake_home / ".config" / "fish" / "config.fish"
+    assert fish_cfg.exists(), "fish config should be created for a fish login shell"
+    content = fish_cfg.read_text()
+    assert "set -gx PATH" in content
+    assert BLOCK_START in content
+    assert "export PATH" not in content  # never write bash syntax into fish config
+
+    installer.uninstall(cfg)
+    assert BLOCK_START not in fish_cfg.read_text()

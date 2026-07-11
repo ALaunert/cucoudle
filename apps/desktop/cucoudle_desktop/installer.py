@@ -28,8 +28,10 @@ from .shim_template import render_shim
 BLOCK_START = "# >>> cucoudle shell integration >>>"
 BLOCK_END = "# <<< cucoudle shell integration <<<"
 
-# rc files we manage, relative to home.
+# POSIX rc files we manage, relative to home (zsh/bash/sh share export syntax).
 SHELL_RC_FILES = (".zshrc", ".bashrc", ".bash_profile", ".profile")
+# fish uses different syntax and its own config location.
+FISH_CONFIG_REL = ".config/fish/config.fish"
 
 
 @dataclass
@@ -67,18 +69,31 @@ def _which_excluding(tool: str, exclude_dir: str) -> str | None:
     return None
 
 
-def path_block(bin_dir: Path) -> str:
-    """The marked block we insert into shell rc files."""
-    return (
-        f"{BLOCK_START}\n"
-        f'export PATH="{bin_dir}:$PATH"\n'
-        f"{BLOCK_END}\n"
-    )
+def resolve_shim_interpreter() -> str:
+    """Pick a portable shebang target for generated shims.
+
+    Prefer ``/usr/bin/env python3`` when a ``python3`` is discoverable on PATH,
+    so shims survive a moved/rebuilt virtualenv and work on other machines.
+    Fall back to the current interpreter's absolute path when no ``python3`` is
+    on PATH, so the shim still runs.
+    """
+    if shutil.which("python3"):
+        return "/usr/bin/env python3"
+    return sys.executable
 
 
-def render_rc_with_block(existing: str, bin_dir: Path) -> str:
+def path_block(bin_dir: Path, kind: str = "posix") -> str:
+    """The marked block we insert into a shell config, per shell family."""
+    if kind == "fish":
+        body = f'set -gx PATH "{bin_dir}" $PATH'
+    else:
+        body = f'export PATH="{bin_dir}:$PATH"'
+    return f"{BLOCK_START}\n{body}\n{BLOCK_END}\n"
+
+
+def render_rc_with_block(existing: str, bin_dir: Path, kind: str = "posix") -> str:
     """Return *existing* rc content with our block inserted or replaced."""
-    block = path_block(bin_dir)
+    block = path_block(bin_dir, kind)
     if BLOCK_START in existing and BLOCK_END in existing:
         pre, rest = existing.split(BLOCK_START, 1)
         _, post = rest.split(BLOCK_END, 1)
@@ -99,7 +114,7 @@ def render_rc_without_block(existing: str) -> str:
 
 def write_shims(cfg: Config, tools: list[DiscoveredTool], python_executable: str | None = None) -> list[str]:
     """Write shim scripts for available tools; return the tool names installed."""
-    python_executable = python_executable or sys.executable
+    python_executable = python_executable or resolve_shim_interpreter()
     cfg.bin_dir.mkdir(parents=True, exist_ok=True)
     content = render_shim(python_executable)
     installed: list[str] = []
@@ -125,46 +140,69 @@ def remove_shims(cfg: Config) -> list[str]:
     return removed
 
 
-def _target_rc_files() -> list[Path]:
-    """Existing rc files we should manage, always including the shell default."""
+def _shell_targets() -> list[tuple[Path, str]]:
+    """Config files to manage as ``(path, kind)`` pairs.
+
+    Covers every existing POSIX rc file plus the fish config, and — when the
+    user has no managed config yet — creates the one matching their login shell
+    (``$SHELL``). Over-covering existing files is harmless: a prepended ``PATH``
+    block is idempotent and a shell simply ignores files it does not read.
+    """
     home = Path.home()
-    files = [home / name for name in SHELL_RC_FILES if (home / name).exists()]
-    if not files:
-        # Nothing exists yet: create the one matching the login shell.
-        shell = os.environ.get("SHELL", "")
-        default = ".zshrc" if shell.endswith("zsh") else ".bashrc"
-        files = [home / default]
-    return files
+    shell = os.environ.get("SHELL", "")
+    targets: list[tuple[Path, str]] = []
+
+    for name in SHELL_RC_FILES:
+        rc = home / name
+        if rc.exists():
+            targets.append((rc, "posix"))
+
+    fish_cfg = home / FISH_CONFIG_REL
+    if fish_cfg.exists() or shell.endswith("fish"):
+        targets.append((fish_cfg, "fish"))
+
+    if not targets:
+        if shell.endswith("fish"):
+            targets.append((fish_cfg, "fish"))
+        elif shell.endswith("zsh"):
+            targets.append((home / ".zshrc", "posix"))
+        else:
+            targets.append((home / ".bashrc", "posix"))
+    return targets
 
 
 def update_shell_config(cfg: Config) -> list[str]:
-    """Insert the PATH block into managed rc files (with a backup). Idempotent."""
+    """Insert the PATH block into managed shell configs (with a backup). Idempotent."""
     changed: list[str] = []
-    for rc in _target_rc_files():
-        existing = rc.read_text(encoding="utf-8") if rc.exists() else ""
-        updated = render_rc_with_block(existing, cfg.bin_dir)
+    for path, kind in _shell_targets():
+        existing = path.read_text(encoding="utf-8") if path.exists() else ""
+        updated = render_rc_with_block(existing, cfg.bin_dir, kind)
         if updated == existing:
             continue
-        if rc.exists():
-            shutil.copy2(rc, rc.with_suffix(rc.suffix + ".cucoudle.bak"))
-        rc.write_text(updated, encoding="utf-8")
-        changed.append(str(rc))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            shutil.copy2(path, path.with_suffix(path.suffix + ".cucoudle.bak"))
+        path.write_text(updated, encoding="utf-8")
+        changed.append(str(path))
     return changed
+
+
+def _managed_config_paths() -> list[Path]:
+    home = Path.home()
+    return [home / name for name in SHELL_RC_FILES] + [home / FISH_CONFIG_REL]
 
 
 def clean_shell_config(cfg: Config) -> list[str]:
     changed: list[str] = []
-    home = Path.home()
-    for name in SHELL_RC_FILES:
-        rc = home / name
-        if not rc.exists():
+    for path in _managed_config_paths():
+        if not path.exists():
             continue
-        existing = rc.read_text(encoding="utf-8")
+        existing = path.read_text(encoding="utf-8")
         updated = render_rc_without_block(existing)
         if updated != existing:
-            shutil.copy2(rc, rc.with_suffix(rc.suffix + ".cucoudle.bak"))
-            rc.write_text(updated, encoding="utf-8")
-            changed.append(str(rc))
+            shutil.copy2(path, path.with_suffix(path.suffix + ".cucoudle.bak"))
+            path.write_text(updated, encoding="utf-8")
+            changed.append(str(path))
     return changed
 
 
@@ -200,15 +238,21 @@ def doctor(cfg: Config) -> dict:
     on_path = str(cfg.bin_dir) in [os.path.abspath(p) if p else "" for p in path_entries] or \
         str(cfg.bin_dir) in path_entries
     rc_status = {}
-    for name in SHELL_RC_FILES:
-        rc = Path.home() / name
-        rc_status[name] = rc.exists() and BLOCK_START in rc.read_text(encoding="utf-8")
+    for path in _managed_config_paths():
+        try:
+            present = path.exists() and BLOCK_START in path.read_text(encoding="utf-8")
+        except OSError:  # pragma: no cover - unreadable file
+            present = False
+        if present:
+            rc_status[str(path)] = True
     return {
         "home": str(cfg.home),
         "binDir": str(cfg.bin_dir),
         "socket": str(cfg.socket_path),
         "socketExists": cfg.socket_path.exists(),
         "binDirOnPath": on_path,
+        "shimInterpreter": resolve_shim_interpreter(),
+        "loginShell": os.environ.get("SHELL", "(unknown)"),
         "realBinaries": {t.name: t.path for t in tools},
         "shimsInstalled": shims,
         "shellBlocks": rc_status,

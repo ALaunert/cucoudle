@@ -216,6 +216,12 @@ if __name__ == "__main__":
 '''
 
 
-def render_shim(python_executable: str) -> str:
-    """Return the full shim file content with a shebang for *python_executable*."""
-    return f"#!{python_executable}\n{SHIM_SOURCE.lstrip()}"
+def render_shim(interpreter: str | None = None) -> str:
+    """Return the full shim file content with a shebang for *interpreter*.
+
+    Defaults to a portable ``/usr/bin/env python3`` so the shim is not tied to a
+    specific (possibly temporary) interpreter path such as a virtualenv. The
+    shim body uses only the standard library, so any Python 3 works.
+    """
+    interpreter = interpreter or "/usr/bin/env python3"
+    return f"#!{interpreter}\n{SHIM_SOURCE.lstrip()}"

@@ -89,8 +89,17 @@ def cmd_install(cfg: Config, args: argparse.Namespace) -> int:
         print("  Not found (no shim):  " + ", ".join(result["missing"]))
     print(f"  Shim directory:       {result['binDir']}")
     if result["shellFiles"]:
-        print("  Updated shell files:  " + ", ".join(result["shellFiles"]))
-    print("\nOpen a new terminal (or `source` your rc file), then run `claude`, `codex` or `agent`.")
+        print("  Updated shell config: " + ", ".join(result["shellFiles"]))
+    if not result["installed"]:
+        print("\n  No supported CLI tools were found on your PATH yet. Install")
+        print("  claude/codex/cursor, then re-run `cucoudle install`.")
+    print("\nNext steps:")
+    print("  1. Open a NEW terminal (or reload your shell config) so the PATH takes effect.")
+    print("  2. Start the daemon so sessions are mirrored to your phone:")
+    print("        cucoudle daemon       # keep it running")
+    print("  3. Run claude / codex / agent as usual, then `cucoudle pair` to link a phone.")
+    print("\nSafe by design: if the daemon is not running, your CLIs still work — the")
+    print("shim transparently falls back to the real binary. Undo anytime: cucoudle uninstall.")
     return 0
 
 
@@ -107,19 +116,26 @@ def cmd_uninstall(cfg: Config, args: argparse.Namespace) -> int:
 def cmd_doctor(cfg: Config, args: argparse.Namespace) -> int:
     info = run_doctor(cfg)
     print(f"Cucoudle doctor  (v{APP_VERSION})\n")
-    print(f"  Home:            {info['home']}")
-    print(f"  Socket:          {info['socket']}  ({'up' if info['socketExists'] else 'down'})")
-    print(f"  Shim dir on PATH:{'  yes' if info['binDirOnPath'] else '  no'}")
+    print(f"  Home:             {info['home']}")
+    print(f"  Login shell:      {info['loginShell']}")
+    print(f"  Shim interpreter: {info['shimInterpreter']}")
+    print(f"  Daemon socket:    {info['socket']}  ({'running' if info['socketExists'] else 'not running'})")
+    print(f"  Shim dir on PATH: {'yes' if info['binDirOnPath'] else 'no (open a new terminal after install)'}")
     print("\n  Real binaries:")
     for tool, path in info["realBinaries"].items():
         print(f"    {tool:<8} {path or '(not found)'}")
     print("\n  Shims installed:")
     for tool, ok in info["shimsInstalled"].items():
         print(f"    {tool:<8} {'yes' if ok else 'no'}")
-    print("\n  Shell PATH block:")
-    for name, ok in info["shellBlocks"].items():
-        if ok:
-            print(f"    {name}: present")
+    print("\n  Shell PATH block present in:")
+    if info["shellBlocks"]:
+        for name in info["shellBlocks"]:
+            print(f"    {name}")
+    else:
+        print("    (none — run `cucoudle install`)")
+    if not info["socketExists"]:
+        print("\n  Note: daemon is not running. Start it with `cucoudle daemon` to enable")
+        print("  remote control (CLIs still work locally without it).")
     return 0
 
 
