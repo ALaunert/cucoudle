@@ -112,8 +112,7 @@ export function AppProvider({ children, dependencies }: AppProviderProps) {
 
   const openSessionDetail = useCallback((sessionId: string) => {
     void runtime.openSession(sessionId);
-    navigation.push(`/session/${sessionId}`);
-  }, [navigation, runtime]);
+  }, [runtime]);
 
   useEffect(() => {
     let active = true;

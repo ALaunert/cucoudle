@@ -112,6 +112,7 @@ test("runs the paired session flow and never duplicates mutating requests", asyn
 
   await runtime.openSession("session-1");
   expect(navigation.push).toHaveBeenCalledWith("/session/session-1");
+  expect(navigation.push).toHaveBeenCalledTimes(1);
   expect(state.terminalBySessionId["session-1"]).toEqual({ text: "snapshot\n", lastSeq: 4 });
 
   eventListener?.({
