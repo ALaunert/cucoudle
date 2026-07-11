@@ -2,9 +2,13 @@
 #
 # Cucoudle desktop — full purge / clean-slate reset.
 #
+# This purges the DESKTOP CLIENT only. The relay is a hosted, always-on service
+# (see deploy/relay/) with its own operator lifecycle — it is never installed,
+# uninstalled, or purged by this script or by `cucoudle install/uninstall`.
+#
 # Removes every trace of the desktop install so you can test install/uninstall
 # cycles from a pristine state:
-#   - stops the running daemon (and, with --with-relay, the local relay/observer);
+#   - stops the running daemon (and, with --dev-rig, a locally-run dev relay/observer);
 #   - strips the marked PATH block from every managed shell config
 #     (.zshrc/.bashrc/.bash_profile/.profile and fish config);
 #   - deletes the Cucoudle home directory (~/.cucoudle, or $CUCOUDLE_HOME).
@@ -14,11 +18,13 @@
 # clearly-marked block in your shell configs.
 #
 # Usage:
-#   purge.sh [--dry-run] [--remove-backups] [--with-relay] [-y]
+#   purge.sh [--dry-run] [--remove-backups] [--dev-rig] [-y]
 #
 #   --dry-run          show what would happen, change nothing
 #   --remove-backups   also delete the *.cucoudle.bak shell-config backups
-#   --with-relay       also stop a locally-running relay and observer helpers
+#   --dev-rig          also stop a LOCALLY-run dev relay + observer (used for
+#                      end-to-end testing on this machine); never touches the
+#                      hosted relay service
 #   -y, --yes          do not prompt for confirmation
 #   -h, --help         this help
 #
@@ -28,19 +34,19 @@ set -u
 
 DRY_RUN=0
 REMOVE_BACKUPS=0
-WITH_RELAY=0
+DEV_RIG=0
 ASSUME_YES=0
 
 MARK_START="# >>> cucoudle shell integration >>>"
 MARK_END="# <<< cucoudle shell integration <<<"
 
-usage() { sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { awk 'NR>=2 && /^#/ {sub(/^# ?/, ""); print; next} NR>=2 {exit}' "$0"; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
     --remove-backups) REMOVE_BACKUPS=1 ;;
-    --with-relay) WITH_RELAY=1 ;;
+    --dev-rig|--with-relay) DEV_RIG=1 ;;
     -y|--yes) ASSUME_YES=1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown option: $1" >&2; usage; exit 2 ;;
@@ -160,9 +166,9 @@ confirm
 
 step "Stopping processes"
 kill_pattern "daemon" "cucoudle_desktop daemon"
-if [ "$WITH_RELAY" -eq 1 ]; then
-  kill_pattern "relay" "tsx src/server.ts"
-  kill_pattern "observer" "observer.py"
+if [ "$DEV_RIG" -eq 1 ]; then
+  kill_pattern "local dev relay" "tsx src/server.ts"
+  kill_pattern "local observer" "observer.py"
 fi
 
 step "Cleaning shell configs"
