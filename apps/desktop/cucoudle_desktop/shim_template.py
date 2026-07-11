@@ -51,6 +51,10 @@ TERMINAL_CLEANUP = (
     b"\x1b[?1015l"  # urxvt mouse coordinates
     b"\x1b[?1016l"  # pixel mouse coordinates
     b"\x1b[?2004l"  # bracketed paste
+    b"\x1b[?2026l"  # synchronized output
+    b"\x1b[?2031l"  # Unicode input mode
+    b"\x1b[<u"      # pop Kitty keyboard protocol flags
+    b"\x1b[>4;0m"   # reset xterm modifyOtherKeys
     b"\x1b[?25h"    # visible cursor
     b"\x1b[0m"      # default character attributes
 )

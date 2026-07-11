@@ -649,3 +649,17 @@
 **Решения, ограничения и проблемы:** Поведение подтверждено тестом на уровне runtime; повторная проверка тапа на физическом устройстве ожидается в рамках общего Expo demo-прогона.
 
 **Следующий шаг:** Demo-прогон на физическом iPhone, включая переход список → сессия → «← Сессии».
+
+## 2026-07-11 — Изоляция PTY от renderer и безопасные daemon-тесты
+
+**Цель:** Устранить самопроизвольные вылеты CLI-сессий и появление terminal reports/буквы `u` в input/render при Claude/Codex TUI.
+
+**Сделано:** Render-only поток фильтрует private DSR и Kitty keyboard CSI с учётом split PTY chunks. Renderer теперь best-effort: любое исключение логируется и отключает styled render только для этой сессии, но raw PTY и relay output продолжают работать. Shim cleanup сбрасывает mouse/focus/paste, synchronized output, Unicode/Kitty keyboard и modifyOtherKeys modes. `AGENTS.md` запрещает агентам останавливать Homebrew service, удалять production socket и использовать broad `pkill`; daemon-тесты обязаны работать в temporary `CUCOUDLE_HOME`.
+
+**Затронутые компоненты:** Desktop renderer/daemon/shim, renderer/daemon/installer tests, agent rules, desktop version `0.1.6` и проектная документация; mobile/relay runtime не менялись.
+
+**Проверки:** Desktop pytest 70/70; отдельный smoke реальной Claude-последовательности (`?2031`, Kitty push/pop, modifyOtherKeys, private DSR, `?2026`) прошёл без исключений и лишнего текста; compileall и `git diff --check` прошли.
+
+**Решения, ограничения и проблемы:** Последний вылет не был самопроизвольным: параллельный Claude-агент явно выполнил `brew services stop`, broad `pkill` и удалил `~/.cucoudle/daemon.sock`; это подтверждено process list и Claude transcript. In-memory PTY по-прежнему не переживает намеренный `SIGKILL` daemon; это архитектурное ограничение, а не ошибка renderer.
+
+**Следующий шаг:** Выпустить Homebrew `v0.1.6`, вернуть машину с manual dev-daemon на Homebrew service и провести controlled Claude/Codex smoke без затрагивания чужих сессий.

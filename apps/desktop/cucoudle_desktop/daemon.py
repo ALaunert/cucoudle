@@ -280,8 +280,13 @@ class Daemon:
             self._emit("terminal.output", {"sessionId": sid, "seq": seq, "data": text})
         entry = self.registry.get(sid)
         if entry is not None and entry.renderer is not None:
-            entry.renderer.feed(data)
-            self._schedule_render(sid)
+            try:
+                entry.renderer.feed(data)
+            except Exception as exc:  # noqa: BLE001 - rendering must never break PTY I/O
+                self.log(f"terminal renderer disabled sid={sid}: {type(exc).__name__}: {exc}")
+                entry.renderer = None
+            else:
+                self._schedule_render(sid)
 
     def _schedule_render(self, sid: str) -> None:
         if sid in self._render_pending:

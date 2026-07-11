@@ -15,6 +15,59 @@ HISTORY_LIMIT = 1000   # styled history lines kept for snapshots
 _PYTE_HISTORY = 10_000  # pyte's own scrollback; large so we can drain increments
 
 
+class _RendererInputFilter:
+    """Remove terminal queries unsupported by pyte from the render-only copy.
+
+    The original PTY bytes still go unchanged to the local terminal and relay.
+    CSI sequences may be split across arbitrary PTY reads, so keep an incomplete
+    suffix until its final byte arrives.
+    """
+
+    def __init__(self) -> None:
+        self.pending = b""
+
+    def process(self, data: bytes) -> bytes:
+        source = self.pending + data
+        self.pending = b""
+        output = bytearray()
+        offset = 0
+
+        while offset < len(source):
+            escape = source.find(b"\x1b", offset)
+            if escape < 0:
+                output.extend(source[offset:])
+                break
+            output.extend(source[offset:escape])
+            if escape + 1 >= len(source):
+                self.pending = source[escape:]
+                break
+            if source[escape + 1] != ord("["):
+                output.append(source[escape])
+                offset = escape + 1
+                continue
+
+            final = escape + 2
+            while final < len(source) and not 0x40 <= source[final] <= 0x7E:
+                final += 1
+            if final >= len(source):
+                self.pending = source[escape:]
+                break
+
+            sequence = source[escape:final + 1]
+            params = source[escape + 2:final]
+            final_byte = source[final]
+            private_dsr = final_byte == ord("n") and params.startswith(b"?")
+            kitty_keyboard = (
+                final_byte == ord("u")
+                and params[:1] in (b"<", b">", b"=", b"?")
+            )
+            if not (private_dsr or kitty_keyboard):
+                output.extend(sequence)
+            offset = final + 1
+
+        return bytes(output)
+
+
 def _run_style(char) -> dict:
     style: dict = {}
     fg, bg = char.fg, char.bg
@@ -59,9 +112,12 @@ class TerminalRenderer:
         self.history: list[list[dict]] = []
         self._consumed = 0
         self.seq = 0
+        self._input_filter = _RendererInputFilter()
 
     def feed(self, data: bytes) -> None:
-        self.stream.feed(data)
+        filtered = self._input_filter.process(data)
+        if filtered:
+            self.stream.feed(filtered)
 
     def _drain_history(self) -> list[list[dict]]:
         top = self.screen.history.top

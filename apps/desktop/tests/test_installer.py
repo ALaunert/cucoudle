@@ -132,6 +132,10 @@ def test_rendered_shim_restores_terminal_private_modes():
     assert 'b"\\x1b[?1000l"' in content
     assert 'b"\\x1b[?1006l"' in content
     assert 'b"\\x1b[?2004l"' in content
+    assert 'b"\\x1b[?2026l"' in content
+    assert 'b"\\x1b[?2031l"' in content
+    assert 'b"\\x1b[<u"' in content
+    assert 'b"\\x1b[>4;0m"' in content
     assert "restore_terminal(stdin_fd, stdout_fd, old_attrs)" in content
 
 

@@ -76,3 +76,23 @@ def test_resize_changes_screen_dimensions():
     frame = r.take_frame("s1")
     assert len(frame["screen"]) == 3
     assert text_of(frame["screen"][0]) == "after resize"
+
+
+def test_private_device_status_query_does_not_break_rendering():
+    r = make()
+    r.feed(b"before\x1b[?5nafter")
+    assert text_of(r.take_frame("s1")["screen"][0]) == "beforeafter"
+
+
+def test_kitty_keyboard_protocol_is_not_rendered_as_text():
+    r = make()
+    r.feed(b"hello\x1b[<u\x1b[>1u\x1b[=3;1uworld")
+    assert text_of(r.take_frame("s1")["screen"][0]) == "helloworld"
+
+
+def test_render_filter_handles_control_sequence_split_across_chunks():
+    r = make()
+    r.feed(b"hello\x1b[?")
+    r.feed(b"5nworld\x1b[")
+    r.feed(b">1u!")
+    assert text_of(r.take_frame("s1")["screen"][0]) == "helloworld!"
