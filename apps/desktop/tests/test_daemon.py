@@ -2,12 +2,13 @@ import asyncio
 import shutil
 import tempfile
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
 from cucoudle_desktop import ipc
 from cucoudle_desktop.config import Config
-from cucoudle_desktop.daemon import Daemon
+from cucoudle_desktop.daemon import Daemon, DaemonAlreadyRunning
 from cucoudle_desktop.protocol import ErrorCode, ProtocolException
 
 
@@ -116,6 +117,37 @@ async def test_remote_input_and_interrupt(short_home):
         writer.close()
 
 
+def test_submitted_text_writes_pty_enter(tmp_path):
+    daemon = Daemon(_cfg(tmp_path))
+    entry = daemon.registry.create("codex", "codex", [], "/tmp")
+    entry.pty = Mock(running=True)
+
+    result = daemon.handle_relay_request("session.input", {
+        "sessionId": entry.session.id,
+        "inputMode": "text",
+        "data": "continue",
+        "submit": True,
+    })
+
+    entry.pty.write.assert_called_once_with(b"continue\r")
+    assert result == {"accepted": True}
+
+
+def test_submitted_legacy_newline_is_not_duplicated(tmp_path):
+    daemon = Daemon(_cfg(tmp_path))
+    entry = daemon.registry.create("codex", "codex", [], "/tmp")
+    entry.pty = Mock(running=True)
+
+    daemon.handle_relay_request("session.input", {
+        "sessionId": entry.session.id,
+        "inputMode": "text",
+        "data": "continue\n",
+        "submit": True,
+    })
+
+    entry.pty.write.assert_called_once_with(b"continue\n")
+
+
 @pytest.mark.asyncio
 async def test_unknown_tool_returns_error_frame(short_home):
     cfg = _cfg(short_home, {})  # no real binaries; a nonsense tool won't resolve
@@ -128,6 +160,27 @@ async def test_unknown_tool_returns_error_frame(short_home):
         assert frame.type == ipc.ERROR
         assert frame.json()["code"] == ErrorCode.TOOL_NOT_FOUND.value
         writer.close()
+
+
+@pytest.mark.asyncio
+async def test_second_daemon_refuses_when_one_is_live(short_home):
+    cfg = _cfg(short_home, {})
+    live = Daemon(cfg)
+    server = await _serve(live)  # a live daemon holding the control socket
+    async with server:
+        other = Daemon(cfg)
+        assert other._existing_daemon_alive() is True
+        with pytest.raises(DaemonAlreadyRunning):
+            await other.run()
+        # refusing must NOT remove the live daemon's socket
+        assert cfg.socket_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_daemon_alive_check_false_for_absent_socket(short_home):
+    cfg = _cfg(short_home, {})
+    daemon = Daemon(cfg)
+    assert daemon._existing_daemon_alive() is False  # nothing bound yet
 
 
 def test_handle_relay_request_errors(tmp_path):

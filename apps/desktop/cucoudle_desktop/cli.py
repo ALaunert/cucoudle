@@ -61,7 +61,7 @@ def control_request(cfg: Config, method: str, params: dict | None = None, timeou
 # ---- commands ----------------------------------------------------------
 
 def cmd_daemon(cfg: Config, args: argparse.Namespace) -> int:
-    from .daemon import Daemon
+    from .daemon import Daemon, DaemonAlreadyRunning
 
     daemon = Daemon(cfg)
 
@@ -77,6 +77,13 @@ def cmd_daemon(cfg: Config, args: argparse.Namespace) -> int:
         asyncio.run(_main())
     except KeyboardInterrupt:
         print("\ncucoudle daemon stopped", file=sys.stderr)
+    except DaemonAlreadyRunning as exc:
+        print(f"cucoudle: {exc}.", file=sys.stderr)
+        print("  A daemon is already running for this machine (e.g. `brew services` "
+              "started one).", file=sys.stderr)
+        print("  To run one manually, stop the other first:  brew services stop cucoudle",
+              file=sys.stderr)
+        return 1
     return 0
 
 

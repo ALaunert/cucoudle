@@ -18,6 +18,7 @@ import asyncio
 import codecs
 import os
 import shutil
+import socket
 import sys
 from datetime import datetime, timezone
 from typing import Any
@@ -29,6 +30,10 @@ from .protocol import ErrorCode, ProtocolException
 from .registry import SessionRegistry
 from .relay_client import RelayClient
 from .session import GenericPtySession
+
+
+class DaemonAlreadyRunning(RuntimeError):
+    """Raised when another live daemon already owns this home's control socket."""
 
 
 class Daemon:
@@ -53,12 +58,37 @@ class Daemon:
             self._log_fh.flush()
 
     # ---- lifecycle -----------------------------------------------------
+    def _existing_daemon_alive(self) -> bool:
+        """True if another daemon is already listening on our control socket.
+
+        Distinguishes a live daemon (connect succeeds) from a stale socket file
+        left by a crashed one (connect refused), so we never steal a live
+        socket and orphan the running daemon.
+        """
+        sock_path = self.cfg.socket_path
+        if not sock_path.exists():
+            return False
+        probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        probe.settimeout(0.5)
+        try:
+            probe.connect(str(sock_path))
+            return True
+        except OSError:
+            return False
+        finally:
+            probe.close()
+
     async def run(self) -> None:
         self.cfg.home.mkdir(parents=True, exist_ok=True)
         self._log_fh = open(self.cfg.log_path, "a", encoding="utf-8")
         sock_path = self.cfg.socket_path
+        if self._existing_daemon_alive():
+            raise DaemonAlreadyRunning(
+                f"another cucoudle daemon is already running for {self.cfg.home} "
+                f"(socket {sock_path})"
+            )
         if sock_path.exists():
-            sock_path.unlink()
+            sock_path.unlink()  # stale socket from a crashed daemon
         self._server = await asyncio.start_unix_server(self._handle_conn, path=str(sock_path))
         os.chmod(sock_path, 0o600)
         await self.relay.start()
@@ -92,12 +122,13 @@ class Daemon:
                 entry.pty.terminate()
         await self.relay.stop()
         if self._server is not None:
+            # Only remove the socket we created; never touch another daemon's.
             self._server.close()
-        if self.cfg.socket_path.exists():
-            try:
-                self.cfg.socket_path.unlink()
-            except OSError:
-                pass
+            if self.cfg.socket_path.exists():
+                try:
+                    self.cfg.socket_path.unlink()
+                except OSError:
+                    pass
         if self._log_fh is not None:
             self._log_fh.close()
 
@@ -309,6 +340,12 @@ class Daemon:
         if method == "session.input":
             entry = self._require_active(params)
             data = str(params.get("data", ""))
+            if params.get("inputMode") == "text" and params.get("submit") is True:
+                # A PTY Enter key is carriage return. New mobile clients send
+                # plain composer text with submit=true; keep newline-terminated
+                # legacy payloads unchanged so mixed-version clients stay safe.
+                if not data.endswith(("\r", "\n")):
+                    data += "\r"
             try:
                 entry.pty.write(data.encode("utf-8"))
             except (OSError, AttributeError) as exc:
