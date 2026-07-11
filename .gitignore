@@ -1,0 +1,30 @@
+# Local AI agent configuration and state
+.cursor/
+.codex/
+.claude/
+.aider/
+.continue/
+.windsurf/
+.cline/
+.roo/
+.gemini/
+.kiro/
+.trae/
+.amazonq/
+.tabnine/
+
+# Generic AI agent caches and generated artifacts
+.agent/
+.agents/
+.ai/
+.agent-cache/
+.ai-cache/
+.agent-artifacts/
+.ai-artifacts/
+agent-artifacts/
+ai-artifacts/
+
+# Aider-generated local history and caches
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.*
