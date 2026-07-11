@@ -15,7 +15,7 @@ import {
   DESKTOP_EVENTS,
   MOBILE_FORWARDED_METHODS,
 } from "@cucoudle/protocol";
-import { RelayState, type MobileConn } from "./state.js";
+import { RelayState, negotiateCapabilities, type MobileConn } from "./state.js";
 import { NOOP_AUDIT_LOGGER, redactPayload, type RelayAuditLogger } from "./audit.js";
 
 export const DEFAULT_MOBILE_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
@@ -79,8 +79,20 @@ export function handleDesktopMessage(
   if (isResponse(msg)) {
     const desktopId = findDesktopId(state, socket);
     if (!desktopId) return;
-    const mobile = state.takePending(desktopId, msg.id);
-    if (mobile) {
+    const pending = state.takePending(desktopId, msg.id);
+    if (pending) {
+      const { mobile, method } = pending;
+      if (
+        msg.ok &&
+        msg.result &&
+        (method === "session.list" || method === "session.subscribe")
+      ) {
+        const desktop = state.getDesktop(desktopId);
+        msg.result.negotiatedCapabilities = negotiateCapabilities(
+          mobile.offeredCapabilities,
+          desktop?.offeredCapabilities ?? [],
+        );
+      }
       auditLog("desktop.response.forwarded", {
         desktopId,
         mobileDeviceId: mobile.mobileDeviceId,
@@ -153,11 +165,13 @@ export function handleMobileMessage(
       options.mobileSessionTtlMs ?? DEFAULT_MOBILE_SESSION_TTL_MS,
       Date.now(),
     );
+    const mobileOffers = p.data.offeredCapabilities ?? [];
     const conn: MobileConn = {
       mobileDeviceId: p.data.mobileDevice.id,
       mobileDevice: p.data.mobileDevice,
       desktopId: p.data.desktopId,
       token: issued.token,
+      offeredCapabilities: mobileOffers,
       socket,
     };
     state.linkMobile(conn);
@@ -173,6 +187,7 @@ export function handleMobileMessage(
       paired: true,
       mobileSessionToken: issued.token,
       mobileSessionExpiresAt: issued.expiresAt,
+      negotiatedCapabilities: negotiateCapabilities(mobileOffers, desktop.offeredCapabilities),
     }));
     send(desktop.socket, makeEvent("mobile.paired", {
       mobileDevice: p.data.mobileDevice,
@@ -188,11 +203,13 @@ export function handleMobileMessage(
     if (!desktop) return send(socket, makeError(msg.id, "DESKTOP_OFFLINE", "desktop is offline"));
     const resumed = state.resumeMobile(p.data.desktopId, p.data.mobileDeviceId, p.data.mobileSessionToken, Date.now());
     if (!resumed.ok) return send(socket, makeError(msg.id, resumed.code, "resume failed"));
+    const mobileOffers = p.data.offeredCapabilities ?? [];
     state.linkMobile({
       mobileDeviceId: p.data.mobileDeviceId,
       mobileDevice: { id: p.data.mobileDeviceId, name: "resumed", platform: "unknown" },
       desktopId: p.data.desktopId,
       token: p.data.mobileSessionToken,
+      offeredCapabilities: mobileOffers,
       socket,
     });
     auditLog("mobile.resumed", {
@@ -200,7 +217,12 @@ export function handleMobileMessage(
       mobileDeviceId: p.data.mobileDeviceId,
       requestId: msg.id,
     });
-    return send(socket, makeResponse(msg.id, { desktopId: desktop.desktopId, desktopName: desktop.name, resumed: true }));
+    return send(socket, makeResponse(msg.id, {
+      desktopId: desktop.desktopId,
+      desktopName: desktop.name,
+      resumed: true,
+      negotiatedCapabilities: negotiateCapabilities(mobileOffers, desktop.offeredCapabilities),
+    }));
   }
 
   if (FORWARDED.has(msg.method)) {
@@ -211,6 +233,7 @@ export function handleMobileMessage(
     const added = state.addPending(
       desktop.desktopId,
       msg.id,
+      msg.method,
       conn,
       options.desktopResponseTimeoutMs ?? DEFAULT_DESKTOP_RESPONSE_TIMEOUT_MS,
       (pendingMobile) => {

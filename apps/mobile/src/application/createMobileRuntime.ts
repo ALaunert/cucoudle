@@ -82,6 +82,7 @@ export function createMobileRuntime(
           desktopId: request.desktopId,
           pairingCode: request.pairingCode,
           mobileDevice: request.mobileDevice,
+          offeredCapabilities: ["interaction.structured"],
         });
       } finally {
         pairingClient.close();

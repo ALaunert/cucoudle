@@ -147,6 +147,7 @@ class RelayClient:
                     "desktopName": self.cfg.desktop_name,
                     "platform": self.cfg.platform,
                     "appVersion": APP_VERSION,
+                    "offeredCapabilities": ["interaction.structured"],
                 },
             )
         except Exception as exc:  # noqa: BLE001

@@ -112,7 +112,7 @@ test("falls back for unsupported structured interaction shapes", () => {
   render(
     <StructuredActionZone
       canMutate
-      interaction={{ ...interaction, kind: "text", options: undefined, allowsText: true }}
+      interaction={{ ...interaction, kind: "multiSelect", options: undefined }}
       negotiatedCapabilities={new Set(["interaction.structured"])}
       onOpenSession={jest.fn()}
       onRespond={jest.fn()}
@@ -122,6 +122,57 @@ test("falls back for unsupported structured interaction shapes", () => {
 
   expect(screen.getByRole("button", { name: "Открыть сессию" })).toBeVisible();
   expect(screen.queryByText("Разрешить")).not.toBeOnTheScreen();
+});
+
+test("renders singleSelect options and responds with the tapped option id", async () => {
+  const onRespond = jest.fn().mockResolvedValue(undefined);
+  render(
+    <StructuredActionZone
+      canMutate
+      interaction={{
+        ...interaction,
+        kind: "singleSelect",
+        options: [
+          { id: "opt-a", label: "Вариант A", intent: "neutral" },
+          { id: "opt-b", label: "Вариант B", intent: "neutral" },
+        ],
+      }}
+      negotiatedCapabilities={new Set(["interaction.structured"])}
+      onOpenSession={jest.fn()}
+      onRespond={onRespond}
+      sessionId="session-1"
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: "Вариант A" })).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "Вариант B" }));
+  await waitFor(() => expect(onRespond).toHaveBeenCalledTimes(1));
+  expect(onRespond).toHaveBeenCalledWith(
+    expect.objectContaining({ response: { type: "options", optionIds: ["opt-b"] } }),
+  );
+});
+
+test("types and sends a text interaction response", async () => {
+  const onRespond = jest.fn().mockResolvedValue(undefined);
+  render(
+    <StructuredActionZone
+      canMutate
+      interaction={{ ...interaction, kind: "text", options: undefined, allowsText: true }}
+      negotiatedCapabilities={new Set(["interaction.structured"])}
+      onOpenSession={jest.fn()}
+      onRespond={onRespond}
+      sessionId="session-1"
+    />,
+  );
+
+  const send = screen.getByRole("button", { name: "Отправить" });
+  expect(send).toBeDisabled();
+  fireEvent.changeText(screen.getByLabelText("Ответ"), "npm test");
+  fireEvent.press(screen.getByRole("button", { name: "Отправить" }));
+  await waitFor(() => expect(onRespond).toHaveBeenCalledTimes(1));
+  expect(onRespond).toHaveBeenCalledWith(
+    expect.objectContaining({ response: { type: "text", text: "npm test", submit: true } }),
+  );
 });
 
 test("lets a fresh resubscribe snapshot decide that the same interaction is still unresolved", async () => {

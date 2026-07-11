@@ -675,3 +675,20 @@
 **Решения, ограничения и проблемы:** Релиз не обещает persistence при `SIGKILL` daemon; он исключает влияние renderer на PTY и гарантирует полный terminal-mode cleanup при разрыве.
 
 **Следующий шаг:** Обновить локальную установку, перегенерировать shims, вернуть Homebrew service и провести controlled live smoke.
+## 2026-07-11 — Структурные интеракции end-to-end (Approve/Reject + общие вопросы)
+
+**Цель:** Довести capability-gated структурные интеракции до реально работающего сквозного пути: desktop детектит промпт → mobile показывает Approve/Reject и общие вопросы → ответ маппится в точный ввод PTY, с raw-terminal fallback для всего нераспознанного.
+
+**Что фактически сделано:**
+- Протокол: новый `capabilities.ts` (`INTERACTION_STRUCTURED`); `offeredCapabilities` в `desktop.register`/`mobile.pair`/`mobile.resume`; `negotiatedCapabilities` в результатах pair/resume/list/subscribe.
+- Relay: хранит offered-наборы desktop и mobile, считает пересечение `mobile ∩ relay ∩ desktop` и кладёт `negotiatedCapabilities` в pair/resume (напрямую) и в форварднутые list/subscribe (инжект по методу из pending-записи).
+- Desktop: `interactions.py` — ярусный `detect_prompt` (yes/no → approval, нумерованное меню → singleSelect, общий текстовый вопрос → text) с гейтом «вывод затих + нет финального `\n`» и debounce 200 мс на asyncio-таймере; регистрация активной интеракции, статус `waiting`, событие `interaction.requested`; обработчик `interaction.respond` с маппингом option→байты PTY, exactly-once, кодами `INTERACTION_STALE`/`INTERACTION_NOT_FOUND`, supersede и `sessionEnded`; `activeInteraction` в `session.subscribe`; `offeredCapabilities` в register.
+- Mobile: `StructuredActionZone` рендерит по `kind` (approval/confirmation → Разрешить/Отклонить/Всегда, singleSelect → кнопки опций, text → поле ввода + Отправить; multiSelect → raw fallback); шлёт `offeredCapabilities` в pair/resume.
+
+**Затронуто:** `packages/protocol/src/{capabilities.ts,index.ts,methods.ts}`; `apps/relay/src/{state.ts,handlers.ts,capabilities.test.ts}`; `apps/desktop/cucoudle_desktop/{interactions.py,protocol.py,registry.py,daemon.py,relay_client.py}` + `apps/desktop/tests/test_interactions.py`; `apps/mobile/src/features/session/StructuredActionZone.tsx` (+ тест) и `apps/mobile/src/application/{connectionCoordinator.ts,createMobileRuntime.ts}` (+ тест).
+
+**Проверки:** core vitest 62 passed, desktop pytest 74 passed, mobile jest 158 passed; typecheck core+mobile — без ошибок; `npm run test:integration` (реальный демон↔relay↔mobile) — ALL STAGES PASSED (регрессия канала с новым кодом); детектор проверен против реального PTY-вывода `bash read -p`: yes/no → approval (`y\n`/`n\n`), вопрос → text, меню → singleSelect (`1\n`/`2\n`).
+
+**Ключевые решения/ограничения:** (A) детект по затиханию вывода (debounce 200 мс), (B) статус `waiting` на время активного промпта, (C) `cancel` = снять интеракцию без ввода, (D) `multiSelect` заложен типом, детектор отложен. Детектор рассчитан на line-oriented промпты; полный alt-screen/TUI-парсинг (напр. родной permission-промпт Claude Code) вне границ — такие состояния остаются в raw-terminal fallback. Сквозной прогон именно через Expo-приложение с настоящим CLI-агентом ещё не выполнялся (проверено техническим клиентом, юнитами и harness'ом).
+
+**Следующий шаг:** Проверить фичу через Expo-приложение на устройстве против настоящего Claude/Codex промпта; при наличии времени — Claude Code alt-screen adapter поверх ярусного детектора.

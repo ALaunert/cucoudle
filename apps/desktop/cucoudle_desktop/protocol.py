@@ -49,6 +49,8 @@ class ErrorCode(str, Enum):
     TOOL_NOT_FOUND = "TOOL_NOT_FOUND"
     DAEMON_UNAVAILABLE = "DAEMON_UNAVAILABLE"
     PTY_WRITE_FAILED = "PTY_WRITE_FAILED"
+    INTERACTION_NOT_FOUND = "INTERACTION_NOT_FOUND"
+    INTERACTION_STALE = "INTERACTION_STALE"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -81,6 +83,68 @@ class Session(BaseModel):
     createdAt: str
     lastActivityAt: str
     exitCode: Optional[int] = None
+
+
+# ---- structured CLI interactions --------------------------------------
+
+
+class InteractionKind(str, Enum):
+    APPROVAL = "approval"
+    CONFIRMATION = "confirmation"
+    SINGLE_SELECT = "singleSelect"
+    MULTI_SELECT = "multiSelect"
+    TEXT = "text"
+
+
+class InteractionOptionIntent(str, Enum):
+    APPROVE = "approve"
+    APPROVE_ONCE = "approveOnce"
+    APPROVE_SESSION = "approveSession"
+    REJECT = "reject"
+    CANCEL = "cancel"
+    NEUTRAL = "neutral"
+
+
+class InteractionOption(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
+    id: str
+    label: str
+    description: Optional[str] = None
+    intent: InteractionOptionIntent
+    shortcut: Optional[str] = None
+    disabled: Optional[bool] = None
+
+
+class InteractionRequest(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
+    id: str
+    sessionId: str
+    kind: InteractionKind
+    prompt: str
+    details: Optional[str] = None
+    options: Optional[list[InteractionOption]] = None
+    allowsText: bool
+    allowsTerminalInput: Literal[True] = True
+    sensitive: Optional[bool] = None
+    createdAt: str
+    terminalSeq: Optional[int] = None
+
+
+class InteractionResponseOptions(BaseModel):
+    type: Literal["options"] = "options"
+    optionIds: list[str]
+
+
+class InteractionResponseText(BaseModel):
+    type: Literal["text"] = "text"
+    text: str
+    submit: Optional[bool] = None
+
+
+class InteractionResponseCancel(BaseModel):
+    type: Literal["cancel"] = "cancel"
 
 
 class ProtocolError(BaseModel):

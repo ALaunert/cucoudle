@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import codecs
 import os
+import secrets
 import shutil
 import socket
 import sys
@@ -26,7 +27,8 @@ from typing import Any
 from . import APP_VERSION
 from .config import MANAGED_ENV_FLAG, SESSION_ENV_VAR, Config
 from . import ipc
-from .protocol import ErrorCode, ProtocolException
+from .interactions import detect_prompt, strip_ansi
+from .protocol import ErrorCode, ProtocolException, SessionStatus, now_iso
 from .registry import SessionRegistry
 from .relay_client import RelayClient
 from .render import TerminalRenderer
@@ -35,6 +37,11 @@ from .session import GenericPtySession
 # Coalesce terminal.render frames: TUI spinners redraw far more often than a
 # phone can usefully repaint, so batch PTY output into ~20fps frames.
 RENDER_FLUSH_DELAY = 0.05
+
+# Wait for a session's output to go quiet before deciding it is parked at a
+# prompt. Redraws during streaming keep resetting this, so we only classify a
+# settled screen.
+INTERACTION_DEBOUNCE = 0.2
 
 
 class DaemonAlreadyRunning(RuntimeError):
@@ -50,6 +57,7 @@ class Daemon:
         self._shim_writers: dict[str, asyncio.StreamWriter] = {}
         self._decoders: dict[str, codecs.IncrementalDecoder] = {}
         self._render_pending: set[str] = set()
+        self._interaction_timers: dict[str, asyncio.TimerHandle] = {}
         self.paired_devices: list[dict] = []
         self._log_fh = None
         self._stop_event: asyncio.Event | None = None
@@ -287,6 +295,7 @@ class Daemon:
                 entry.renderer = None
             else:
                 self._schedule_render(sid)
+        self._schedule_interaction_detect(sid)
 
     def _schedule_render(self, sid: str) -> None:
         if sid in self._render_pending:
@@ -305,8 +314,101 @@ class Daemon:
             return
         self._emit("terminal.render", entry.renderer.take_frame(sid))
 
+    # ---- structured interactions --------------------------------------
+    def _schedule_interaction_detect(self, sid: str) -> None:
+        """(Re)arm the debounce timer that classifies the settled output tail."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:  # pragma: no cover - tests may call sync
+            return
+        existing = self._interaction_timers.pop(sid, None)
+        if existing is not None:
+            existing.cancel()
+        self._interaction_timers[sid] = loop.call_later(
+            INTERACTION_DEBOUNCE, self._detect_interaction, sid
+        )
+
+    def _detect_interaction(self, sid: str) -> None:
+        self._interaction_timers.pop(sid, None)
+        entry = self.registry.get(sid)
+        if entry is None or entry.pty is None or not entry.pty.running:
+            return
+        tail = self.registry.output_tail(sid)
+        if tail is None:
+            return
+        clean = strip_ansi(tail)
+        ended_with_newline = clean.endswith("\n") or clean.endswith("\r")
+        detected = detect_prompt(tail, ended_with_newline)
+        active = entry.active_interaction
+        if detected is None:
+            # Output settled past the prompt without a new one: the pending
+            # interaction (if any) no longer maps to the screen.
+            if active is not None:
+                self._resolve_interaction(sid, "superseded")
+            return
+        signature = detected.signature()
+        if active is not None and entry.interaction_signature == signature:
+            return  # same prompt re-rendered; nothing changed
+        if active is not None:
+            self._resolve_interaction(sid, "superseded")
+        self._register_interaction(sid, detected)
+
+    def _register_interaction(self, sid: str, detected) -> None:
+        entry = self.registry.get(sid)
+        if entry is None:
+            return
+        seq = self.registry.current_seq
+        iid = "int_" + secrets.token_hex(4)
+        req = detected.to_request(
+            interaction_id=iid, session_id=sid, created_at=now_iso(), terminal_seq=seq
+        )
+        entry.active_interaction = req
+        entry.interaction_bytes = dict(detected.option_bytes)
+        entry.interaction_signature = detected.signature()
+        entry.interaction_seq = seq
+        entry.known_interaction_ids.add(iid)
+        self.registry.mark_waiting(sid)
+        self._emit("interaction.requested", {"interaction": req.model_dump(exclude_none=True)})
+        self._emit("session.updated", {"session": entry.session.model_dump(exclude_none=True)})
+        self.log(f"session {sid} waiting on interaction {iid} ({req.kind})")
+
+    def _resolve_interaction(self, sid: str, resolution: str,
+                             option_ids: list[str] | None = None):
+        """Clear the active interaction and emit ``interaction.resolved``.
+
+        Returns the request that was resolved, or ``None`` if there was none.
+        """
+        entry = self.registry.get(sid)
+        if entry is None or entry.active_interaction is None:
+            return None
+        req = entry.active_interaction
+        entry.active_interaction = None
+        entry.interaction_bytes = {}
+        entry.interaction_signature = None
+        entry.interaction_seq = None
+        data: dict[str, Any] = {
+            "interactionId": req.id,
+            "sessionId": sid,
+            "resolution": resolution,
+            "resolvedAt": now_iso(),
+        }
+        if option_ids:
+            data["optionIds"] = option_ids
+        self._emit("interaction.resolved", data)
+        # Return to running once the block clears (session-end keeps stopped).
+        if resolution != "sessionEnded" and entry.session.status == SessionStatus.WAITING.value:
+            self.registry.mark_running(sid)
+            self._emit("session.updated", {"session": entry.session.model_dump(exclude_none=True)})
+        return req
+
     def _on_exit(self, sid: str, code: int | None) -> None:
         self._flush_render(sid)  # final frame so mobile sees the last output
+        timer = self._interaction_timers.pop(sid, None)
+        if timer is not None:
+            timer.cancel()
+        entry = self.registry.get(sid)
+        if entry is not None and entry.active_interaction is not None:
+            self._resolve_interaction(sid, "sessionEnded")
         self.registry.mark_ended(sid, code)
         writer = self._shim_writers.get(sid)
         if writer is not None:
@@ -428,7 +530,64 @@ class Daemon:
                 entry.renderer.resize(cols, rows)
             return {"accepted": True}
 
+        if method == "interaction.respond":
+            return self._handle_interaction_respond(params)
+
         raise ProtocolException(ErrorCode.UNSUPPORTED_METHOD, f"unknown method '{method}'")
+
+    def _handle_interaction_respond(self, params: dict) -> dict:
+        sid = str(params.get("sessionId", ""))
+        iid = str(params.get("interactionId", ""))
+        response = dict(params.get("response") or {})
+        entry = self.registry.get(sid)
+        if entry is None:
+            raise ProtocolException(ErrorCode.SESSION_NOT_FOUND, f"session '{sid}' not found")
+        if iid not in entry.known_interaction_ids:
+            raise ProtocolException(ErrorCode.INTERACTION_NOT_FOUND, f"interaction '{iid}' not found")
+        active = entry.active_interaction
+        if active is None or active.id != iid:
+            # Known but no longer current (already answered, or terminal state
+            # moved on). Duplicate responses land here and are safely ignored.
+            raise ProtocolException(ErrorCode.INTERACTION_STALE, f"interaction '{iid}' is no longer active")
+
+        rtype = str(response.get("type", ""))
+        # Capture the binding before resolving clears it, then mark the
+        # interaction resolved BEFORE touching the PTY so a duplicate can never
+        # write twice (exactly-once).
+        bindings = entry.interaction_bytes
+
+        if rtype == "options":
+            option_ids = [str(o) for o in (response.get("optionIds") or [])]
+            payload = bindings.get(option_ids[0]) if option_ids else None
+            self._resolve_interaction(sid, "answered", option_ids=option_ids)
+            self._write_pty(entry, payload)
+            return {"accepted": True}
+
+        if rtype == "text":
+            text = str(response.get("text", ""))
+            payload = text.encode("utf-8")
+            if bool(response.get("submit")):
+                payload += b"\n"
+            self._resolve_interaction(sid, "answered")
+            self._write_pty(entry, payload)
+            return {"accepted": True}
+
+        if rtype == "cancel":
+            # Cancel writes nothing to the PTY; the CLI stays parked and the
+            # user can still steer it with raw terminal input.
+            self._resolve_interaction(sid, "cancelled")
+            return {"accepted": True}
+
+        raise ProtocolException(ErrorCode.INVALID_MESSAGE, f"unknown response type '{rtype}'")
+
+    @staticmethod
+    def _write_pty(entry, payload: bytes | None) -> None:
+        if not payload:
+            return
+        try:
+            entry.pty.write(payload)
+        except (OSError, AttributeError) as exc:
+            raise ProtocolException(ErrorCode.PTY_WRITE_FAILED, str(exc))
 
     def _require_active(self, params: dict):
         sid = str(params.get("sessionId", ""))

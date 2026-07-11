@@ -1,12 +1,27 @@
 import { randomInt, randomUUID } from "node:crypto";
 import type { WebSocket } from "@fastify/websocket";
-import type { ErrorCode, MobileDevice, QrPayload } from "@cucoudle/protocol";
+import { PROTOCOL_CAPABILITIES, type ErrorCode, type MobileDevice, type QrPayload } from "@cucoudle/protocol";
+
+// Capabilities the relay itself can carry (it forwards interaction.respond and
+// fans out interaction.* events). The negotiated set is the intersection of
+// mobile, relay and desktop offers.
+export const RELAY_CAPABILITIES: readonly string[] = PROTOCOL_CAPABILITIES;
+
+export function negotiateCapabilities(
+  mobileOffered: readonly string[],
+  desktopOffered: readonly string[],
+): string[] {
+  const desktop = new Set(desktopOffered);
+  const relay = new Set(RELAY_CAPABILITIES);
+  return mobileOffered.filter((c) => relay.has(c) && desktop.has(c));
+}
 
 export type DesktopConn = {
   desktopId: string;
   name: string;
   platform: string;
   appVersion: string;
+  offeredCapabilities: string[];
   socket: WebSocket;
 };
 
@@ -15,6 +30,7 @@ export type MobileConn = {
   mobileDevice: MobileDevice;
   desktopId: string;
   token: string;
+  offeredCapabilities: string[];
   socket: WebSocket;
 };
 
@@ -23,6 +39,7 @@ type MobileSession = { desktopId: string; mobileDeviceId: string; expiresAt: num
 type PendingRequest = {
   desktopId: string;
   requestId: string;
+  method: string;
   mobile: MobileConn;
   timeout: ReturnType<typeof setTimeout>;
 };
@@ -46,7 +63,13 @@ export class RelayState {
   private readonly pending = new Map<string, PendingRequest>();
 
   registerDesktop(
-    params: { desktopId: string; desktopName: string; platform: string; appVersion: string },
+    params: {
+      desktopId: string;
+      desktopName: string;
+      platform: string;
+      appVersion: string;
+      offeredCapabilities?: string[];
+    },
     socket: WebSocket,
   ): void {
     for (const [id, connection] of this.desktops) {
@@ -59,6 +82,7 @@ export class RelayState {
       name: params.desktopName,
       platform: params.platform,
       appVersion: params.appVersion,
+      offeredCapabilities: params.offeredCapabilities ?? [],
       socket,
     });
   }
@@ -172,6 +196,7 @@ export class RelayState {
   addPending(
     desktopId: string,
     requestId: string,
+    method: string,
     mobile: MobileConn,
     timeoutMs: number,
     onTimeout: (mobile: MobileConn) => void,
@@ -185,17 +210,17 @@ export class RelayState {
       onTimeout(pending.mobile);
     }, timeoutMs);
     timeout.unref();
-    this.pending.set(key, { desktopId, requestId, mobile, timeout });
+    this.pending.set(key, { desktopId, requestId, method, mobile, timeout });
     return true;
   }
 
-  takePending(desktopId: string, requestId: string): MobileConn | undefined {
+  takePending(desktopId: string, requestId: string): { mobile: MobileConn; method: string } | undefined {
     const key = this.pendingKey(desktopId, requestId);
     const pending = this.pending.get(key);
     if (!pending) return undefined;
     clearTimeout(pending.timeout);
     this.pending.delete(key);
-    return pending.mobile;
+    return { mobile: pending.mobile, method: pending.method };
   }
 
   removePendingForDesktop(desktopId: string): Array<{ requestId: string; mobile: MobileConn }> {

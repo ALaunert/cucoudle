@@ -16,7 +16,14 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .protocol import AgentKind, Session, SessionStatus, classify_agent, now_iso
+from .protocol import (
+    AgentKind,
+    InteractionRequest,
+    Session,
+    SessionStatus,
+    classify_agent,
+    now_iso,
+)
 from .render import TerminalRenderer
 from .session import GenericPtySession
 
@@ -39,6 +46,12 @@ class SessionEntry:
     renderer: TerminalRenderer | None = None
     buffer: deque[OutputChunk] = field(default_factory=deque)
     buffered_bytes: int = 0
+    # Structured-interaction state (see interactions.py / daemon lifecycle).
+    active_interaction: Optional[InteractionRequest] = None
+    interaction_bytes: dict[str, bytes] = field(default_factory=dict)
+    interaction_signature: Optional[tuple] = None
+    interaction_seq: Optional[int] = None
+    known_interaction_ids: set[str] = field(default_factory=set)
 
     def append_output(self, seq: int, data: str) -> None:
         self.buffer.append(OutputChunk(seq, data))
@@ -141,6 +154,20 @@ class SessionRegistry:
             entry.session.status = SessionStatus.RUNNING.value
             entry.session.lastActivityAt = now_iso()
 
+    def mark_waiting(self, session_id: str) -> None:
+        entry = self._entries.get(session_id)
+        if entry:
+            entry.session.status = SessionStatus.WAITING.value
+            entry.session.lastActivityAt = now_iso()
+
+    def output_tail(self, session_id: str, max_chars: int = 4000) -> str | None:
+        """Recent decoded output for prompt detection, or ``None`` if empty."""
+        entry = self._entries.get(session_id)
+        if entry is None or not entry.buffer:
+            return None
+        text = "".join(c.data for c in entry.buffer)
+        return text[-max_chars:]
+
     def mark_ended(self, session_id: str, exit_code: int | None) -> None:
         entry = self._entries.get(session_id)
         if entry:
@@ -194,6 +221,8 @@ class SessionRegistry:
                     "terminalBuffer": buffer_text,
                     "lastSeq": last,
                 }
+        if entry.active_interaction is not None:
+            view["activeInteraction"] = entry.active_interaction.model_dump(exclude_none=True)
         if entry.renderer is not None:
             view["terminalRender"] = entry.renderer.snapshot()
         return view

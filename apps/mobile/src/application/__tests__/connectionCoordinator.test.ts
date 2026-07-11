@@ -107,6 +107,7 @@ test("connects to the exact profile relay then resumes, replaces the list, and r
       desktopId: profile.desktopId,
       mobileDeviceId: profile.mobileDeviceId,
       mobileSessionToken: profile.mobileSessionToken,
+      offeredCapabilities: ["interaction.structured"],
     }],
     ["session.list", {}],
     ["session.subscribe", { sessionId: session.id, afterSeq: 9 }],

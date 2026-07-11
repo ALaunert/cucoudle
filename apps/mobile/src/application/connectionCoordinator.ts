@@ -170,6 +170,7 @@ export function createConnectionCoordinator(
         desktopId: activeProfile.desktopId,
         mobileDeviceId: activeProfile.mobileDeviceId,
         mobileSessionToken: activeProfile.mobileSessionToken,
+        offeredCapabilities: ["interaction.structured"],
       });
       if (disposed || version !== runVersion) return;
       setCapabilities(negotiatedCapabilities(resume));

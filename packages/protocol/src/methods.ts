@@ -43,6 +43,7 @@ export const MobilePairParamsSchema = z.object({
   desktopId: z.string(),
   pairingCode: z.string(),
   mobileDevice: MobileDeviceSchema,
+  offeredCapabilities: z.array(z.string()).optional(),
 });
 export const MobilePairResultSchema = z.object({
   desktopId: z.string(),
@@ -50,21 +51,25 @@ export const MobilePairResultSchema = z.object({
   paired: z.literal(true),
   mobileSessionToken: z.string(),
   mobileSessionExpiresAt: z.string(),
+  negotiatedCapabilities: z.array(z.string()).optional(),
 });
 
 export const MobileResumeParamsSchema = z.object({
   desktopId: z.string(),
   mobileDeviceId: z.string(),
   mobileSessionToken: z.string(),
+  offeredCapabilities: z.array(z.string()).optional(),
 });
 export const MobileResumeResultSchema = z.object({
   desktopId: z.string(),
   desktopName: z.string(),
   resumed: z.literal(true),
+  negotiatedCapabilities: z.array(z.string()).optional(),
 });
 
 export const SessionListResultSchema = z.object({
   sessions: z.array(SessionSchema),
+  negotiatedCapabilities: z.array(z.string()).optional(),
 });
 
 export const SessionSubscribeParamsSchema = z.object({
@@ -79,6 +84,7 @@ export const SessionSubscribeResultSchema = z.object({
   lastSeq: z.number().optional(),
   activeInteraction: InteractionRequestSchema.optional(),
   terminalRender: TerminalRenderSnapshotSchema.optional(),
+  negotiatedCapabilities: z.array(z.string()).optional(),
 });
 
 // session.input has four additive PTY-write modes. text/raw stay
@@ -144,6 +150,7 @@ export const DesktopRegisterParamsSchema = z.object({
   desktopName: z.string(),
   platform: z.string(),
   appVersion: z.string(),
+  offeredCapabilities: z.array(z.string()).optional(),
 });
 
 export const DesktopPairingCreateParamsSchema = z.object({
