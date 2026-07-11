@@ -17,6 +17,8 @@ export const ERROR_CODES = [
   "TOOL_NOT_FOUND",
   "DAEMON_UNAVAILABLE",
   "PTY_WRITE_FAILED",
+  "INTERACTION_NOT_FOUND",
+  "INTERACTION_STALE",
   "INTERNAL_ERROR",
 ] as const;
 export const ErrorCodeSchema = z.enum(ERROR_CODES);

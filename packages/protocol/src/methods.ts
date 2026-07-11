@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MobileDeviceSchema, SessionSchema } from "./sessions.js";
 import { EventMessageSchema } from "./envelope.js";
+import { InteractionRequestSchema } from "./events.js";
 
 export const MOBILE_METHODS = [
   "mobile.pair",
@@ -10,6 +11,7 @@ export const MOBILE_METHODS = [
   "session.input",
   "session.interrupt",
   "terminal.resize",
+  "interaction.respond",
 ] as const;
 
 export const DESKTOP_METHODS = [
@@ -25,6 +27,7 @@ export const MOBILE_FORWARDED_METHODS = [
   "session.input",
   "session.interrupt",
   "terminal.resize",
+  "interaction.respond",
 ] as const;
 
 export const QrPayloadSchema = z.object({
@@ -73,16 +76,59 @@ export const SessionSubscribeResultSchema = z.object({
   events: z.array(EventMessageSchema).optional(),
   terminalBuffer: z.string().optional(),
   lastSeq: z.number().optional(),
+  activeInteraction: InteractionRequestSchema.optional(),
 });
 
-export const SessionInputParamsSchema = z.object({
-  sessionId: z.string(),
-  data: z.string(),
-  inputMode: z.enum(["text", "raw"]),
+// session.input has four additive PTY-write modes. text/raw stay
+// backward-compatible; bytes/keys give full terminal parity from the phone.
+export const TerminalModifierSchema = z.enum(["ctrl", "alt", "shift", "meta"]);
+export type TerminalModifier = z.infer<typeof TerminalModifierSchema>;
+
+export const TerminalKeyNameSchema = z.enum([
+  "enter", "escape", "tab", "backspace", "delete", "insert",
+  "arrowUp", "arrowDown", "arrowLeft", "arrowRight",
+  "home", "end", "pageUp", "pageDown", "space",
+  "f1", "f2", "f3", "f4", "f5", "f6",
+  "f7", "f8", "f9", "f10", "f11", "f12",
+]);
+export type TerminalKeyName = z.infer<typeof TerminalKeyNameSchema>;
+
+export const TerminalKeyStrokeSchema = z.object({
+  key: z.union([TerminalKeyNameSchema, z.object({ character: z.string() })]),
+  modifiers: z.array(TerminalModifierSchema).optional(),
+});
+export type TerminalKeyStroke = z.infer<typeof TerminalKeyStrokeSchema>;
+
+export const SessionInputParamsSchema = z.discriminatedUnion("inputMode", [
+  z.object({ sessionId: z.string(), inputMode: z.literal("text"), data: z.string(), submit: z.boolean().optional() }),
+  z.object({ sessionId: z.string(), inputMode: z.literal("raw"), data: z.string() }),
+  z.object({ sessionId: z.string(), inputMode: z.literal("bytes"), dataBase64: z.string() }),
+  z.object({ sessionId: z.string(), inputMode: z.literal("keys"), keys: z.array(TerminalKeyStrokeSchema) }),
+]);
+export type SessionInputParams = z.infer<typeof SessionInputParamsSchema>;
+
+export const SessionInputResultSchema = z.object({
+  accepted: z.boolean(),
+  bytesWritten: z.number().optional(),
 });
 
 export const SessionInterruptParamsSchema = z.object({
   sessionId: z.string(),
+});
+
+// interaction.respond — mobile answers a structured CLI prompt. Relay forwards
+// it verbatim; desktop maps the response to the exact PTY input.
+export const InteractionResponseSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("options"), optionIds: z.array(z.string()) }),
+  z.object({ type: z.literal("text"), text: z.string(), submit: z.boolean().optional() }),
+  z.object({ type: z.literal("cancel") }),
+]);
+export type InteractionResponse = z.infer<typeof InteractionResponseSchema>;
+
+export const InteractionRespondParamsSchema = z.object({
+  sessionId: z.string(),
+  interactionId: z.string(),
+  response: InteractionResponseSchema,
 });
 
 export const TerminalResizeParamsSchema = z.object({
