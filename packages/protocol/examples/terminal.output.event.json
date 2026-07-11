@@ -1,0 +1,7 @@
+{
+  "version": "2026-07-11",
+  "kind": "event",
+  "event": "terminal.output",
+  "data": { "sessionId": "sess_1", "seq": 121, "data": "Running tests...\r\n" },
+  "sentAt": "2026-07-11T10:00:12Z"
+}

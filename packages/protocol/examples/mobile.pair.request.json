@@ -1,0 +1,12 @@
+{
+  "version": "2026-07-11",
+  "kind": "request",
+  "id": "req_1",
+  "method": "mobile.pair",
+  "params": {
+    "desktopId": "desk_123",
+    "pairingCode": "123456",
+    "mobileDevice": { "id": "mob_abc", "name": "Sasha iPhone", "platform": "ios" }
+  },
+  "sentAt": "2026-07-11T10:00:00Z"
+}

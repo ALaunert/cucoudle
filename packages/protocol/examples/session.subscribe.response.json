@@ -1,0 +1,22 @@
+{
+  "version": "2026-07-11",
+  "kind": "response",
+  "id": "req_3",
+  "ok": true,
+  "result": {
+    "session": {
+      "id": "sess_1",
+      "agent": "claude",
+      "title": "Claude · cucoudle",
+      "command": "claude",
+      "argv": [],
+      "cwd": "/Users/sasha/server/cucoudle",
+      "status": "running",
+      "createdAt": "2026-07-11T09:58:00Z",
+      "lastActivityAt": "2026-07-11T10:00:09Z"
+    },
+    "mode": "replay",
+    "events": []
+  },
+  "sentAt": "2026-07-11T10:00:10Z"
+}
