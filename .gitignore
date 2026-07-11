@@ -55,3 +55,7 @@ build/
 
 # Local auto-pull log
 .auto-pull.log
+
+# Local dev desktop helper artifacts
+.dev-venv/
+.dev-desktop.log

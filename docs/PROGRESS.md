@@ -459,6 +459,7 @@
 **Решения, ограничения и проблемы:** Логи предназначены для тестирования маршрутизации и эксплуатации, а не для transcript storage. Input logging является явным временным режимом и должен быть выключен после тестов, поскольку terminal text может содержать чувствительные данные. Остальные params payload не журналируются.
 
 **Следующий шаг:** Развернуть через активный relay pipeline, отправить тестовый запрос с другого компьютера и подтвердить его по production JSON log.
+
 ## 2026-07-11 — Исправление Homebrew formula: отсутствующие runtime-зависимости
 
 **Цель:** Починить `cucoudle daemon`, падавший после `brew install` с `ModuleNotFoundError: No module named 'pydantic'`.
@@ -486,3 +487,17 @@
 **Решения, ограничения и проблемы:** Пользователь один раз запускает `brew services start cucoudle`; после этого daemon общий для всех терминалов, работает через LaunchAgent и не требует открытого terminal window. Bottled `pydantic` исключает локальную Rust-сборку; generic non-Homebrew Linux install всё ещё требует отдельного systemd user integration.
 
 **Следующий шаг:** Опубликовать formula fix; пользователям установленного stable `0.1.0` потребуется `brew update && brew upgrade cucoudle`, после чего достаточно одной команды `brew services start cucoudle`.
+
+## 2026-07-11 — Одна команда для локального desktop-демо (разработчик 3)
+
+**Цель:** Убрать ручную возню с venv/PYTHONPATH/шимами при демонстрации: одна команда поднимает desktop-сторону, готовую к паре с телефоном через прод-relay.
+
+**Сделано:** Добавлен `scripts/dev-desktop.sh`: создаёт локальный venv и ставит зависимости демона, запускает `cucoudle_desktop daemon` (по умолчанию на встроенный `wss://relay.launert.dev`), спаунит одну управляемую сессию (по умолчанию `bash`, можно `claude`) и печатает pairing-QR. Логи демона уходят в `.dev-desktop.log`, артефакты (`.dev-venv/`, лог) добавлены в `.gitignore`. Код `apps/desktop` не изменялся — скрипт только запускает его.
+
+**Затронутые компоненты:** `scripts/dev-desktop.sh`, `.gitignore`.
+
+**Проверки:** Живой прогон против прод-relay: демон подключился к `wss://relay.launert.dev/v1/ws/desktop` и зарегистрировался, сессия `bash` создана, `pairing.create` вернул `qrPayload.relayUrl = wss://relay.launert.dev/v1/ws/mobile` (телефон идёт на прод, LAN не нужен). QR отрендерился.
+
+**Решения, ограничения и проблемы:** Скрипт запускается из исходников через venv (у dev-машины Python 3.10, а pyproject требует 3.11 — venv обходит). Это dev-инструмент; в продукте роль скрипта играет packaged desktop (`brew install` + автозапуск). Мобильный Metro всё ещё локальный — приложение запускается отдельно через `expo start --tunnel`.
+
+**Следующий шаг:** По готовности — свести и mobile-запуск в общий скрипт/README-раздел «demo за 2 команды».
