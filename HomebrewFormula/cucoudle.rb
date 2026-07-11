@@ -10,14 +10,17 @@ class Cucoudle < Formula
 
   depends_on "python@3.13"
 
+  revision 1
+
   def install
     # The desktop client lives in apps/desktop. Build an isolated virtualenv in
-    # libexec, install the package (pip pulls pydantic/websockets/qrcode wheels
-    # from PyPI — no Rust toolchain needed), then link the CLI onto PATH.
-    venv = virtualenv_create(libexec, "python3.13")
-    cd "apps/desktop" do
-      venv.pip_install Pathname.pwd
-    end
+    # libexec and install the package together with its dependencies
+    # (pydantic/websockets/qrcode wheels from PyPI — no Rust toolchain needed).
+    # Homebrew's venv.pip_install always passes --no-deps, so we bootstrap pip
+    # and call it directly instead.
+    virtualenv_create(libexec, "python3.13")
+    system libexec/"bin/python", "-m", "ensurepip", "--upgrade"
+    system libexec/"bin/python", "-m", "pip", "install", buildpath/"apps/desktop"
     bin.install_symlink libexec/"bin/cucoudle"
   end
 
@@ -45,5 +48,8 @@ class Cucoudle < Formula
 
   test do
     assert_match "cucoudle", shell_output("#{bin}/cucoudle --version")
+    # --version passes even without runtime deps; importing the daemon module
+    # proves pydantic/websockets actually landed in the venv.
+    system libexec/"bin/python", "-c", "import cucoudle_desktop.daemon"
   end
 end

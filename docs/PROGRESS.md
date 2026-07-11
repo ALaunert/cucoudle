@@ -459,3 +459,16 @@
 **Решения, ограничения и проблемы:** Логи предназначены для тестирования маршрутизации и эксплуатации, а не для transcript storage. Input logging является явным временным режимом и должен быть выключен после тестов, поскольку terminal text может содержать чувствительные данные. Остальные params payload не журналируются.
 
 **Следующий шаг:** Развернуть через активный relay pipeline, отправить тестовый запрос с другого компьютера и подтвердить его по production JSON log.
+## 2026-07-11 — Исправление Homebrew formula: отсутствующие runtime-зависимости
+
+**Цель:** Починить `cucoudle daemon`, падавший после `brew install` с `ModuleNotFoundError: No module named 'pydantic'`.
+
+**Сделано:** Найдена корневая причина: Homebrew-хелпер `venv.pip_install` всегда передаёт pip флаг `--no-deps`, поэтому pydantic/websockets/qrcode никогда не попадали в virtualenv формулы, а `cucoudle --version` проходил из-за ленивого импорта daemon. Формула переведена на bootstrapped pip (`ensurepip` + прямой `pip install` с зависимостями, wheels с PyPI, Rust не нужен), добавлен `revision 1`, тест формулы усилен импортом `cucoudle_desktop.daemon`.
+
+**Затронутые компоненты:** `HomebrewFormula/cucoudle.rb`, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
+
+**Проверки:** `brew reinstall cucoudle` из исправленной формулы собрал `0.1.0_1` (479 файлов вместо пустого venv); импорт `cucoudle_desktop.daemon` и pydantic/websockets/qrcode в venv — успешно; `cucoudle --version` — успешно; `brew test cucoudle` — PASS.
+
+**Решения, ограничения и проблемы:** Для third-party tap выбран прямой pip с сетевым доступом вместо resource-блоков Homebrew: sdist `pydantic-core` требует Rust/maturin, а wheels с PyPI — нет. Пользователям с уже сломанной установкой нужен `brew update && brew reinstall cucoudle` (и `brew services restart cucoudle`, если демон запущен как сервис).
+
+**Следующий шаг:** Продолжить Task 14 (production runtime composition и mobile smoke); при следующем релизе убрать `revision` вместе с бампом версии.
