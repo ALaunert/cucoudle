@@ -5,8 +5,8 @@ class Cucoudle < Formula
 
   desc "Remote-control local CLI agent sessions (Claude, Codex, Cursor) from your phone"
   homepage "https://github.com/ALaunert/cucoudle"
-  url "https://github.com/ALaunert/cucoudle/archive/refs/tags/v0.1.2.tar.gz"
-  sha256 "d7f45ab04ad0e51197ed2f92e734f5cb5bfc287585fbf929c2c30f67060aeb33"
+  url "https://github.com/ALaunert/cucoudle/archive/refs/tags/v0.1.3.tar.gz"
+  sha256 "473a55ebcda10bd71facbfecf3f089024f63bff246787412077ba1e317c19116"
   license "MIT"
   head "https://github.com/ALaunert/cucoudle.git", branch: "main"
 
