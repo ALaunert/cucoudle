@@ -307,3 +307,17 @@
 **Решения, ограничения и проблемы:** Hosted lifecycle учтен в target architecture. Это не означает, что production уже работает: текущий remote virtual host возвращает Vite `403`, а in-memory state и отсутствие device authentication пока не соответствуют полноценному production режиму.
 
 **Следующий шаг:** Администратору развернуть один shared relay service, включить Nginx WSS routing/monitoring и проверить desktop/mobile connections; пользовательские installers при этом не меняются.
+
+## 2026-07-11 — Полный desktop uninstall и clean-slate purge
+
+**Цель:** Сохранить завершенный параллельный desktop-инкремент и сделать циклы установки/удаления безопасно проверяемыми.
+
+**Сделано:** `cucoudle uninstall` теперь сначала штатно останавливает daemon, очищает shell integration и поддерживает `--purge` для удаления config/logs/home. Daemon получил control request `shutdown`. Добавлен self-contained POSIX `apps/desktop/scripts/purge.sh` с dry-run, подтверждением, очисткой marked PATH blocks и optional local relay cleanup.
+
+**Затронутые компоненты:** Desktop CLI, daemon control, installer, tests, purge script и актуальная документация. Изменения подготовлены параллельным desktop-агентом и зафиксированы отдельно от hosted relay lifecycle.
+
+**Проверки:** Desktop suite — 49 passed; `sh -n apps/desktop/scripts/purge.sh` — успешно; help path purge script — успешно.
+
+**Решения, ограничения и проблемы:** User-facing uninstall касается только desktop-клиента. Hosted production relay принципиально не останавливается и не удаляется этой командой; `--with-relay` в purge script предназначен только для локальной development среды.
+
+**Следующий шаг:** Добавить автоматический daemon autostart и packaged installer, сохранив полный cleanup path.

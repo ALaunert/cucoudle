@@ -168,3 +168,40 @@ def test_fish_install_uses_fish_config(tmp_path, monkeypatch):
 
     installer.uninstall(cfg)
     assert BLOCK_START not in fish_cfg.read_text()
+
+
+def test_uninstall_purge_home_removes_everything(tmp_path, monkeypatch):
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+    (fake_home / ".zshrc").write_text("# base\n")
+
+    tools_dir = tmp_path / "realbin"
+    tools_dir.mkdir()
+    (tools_dir / "claude").write_text("#!/bin/sh\n")
+    (tools_dir / "claude").chmod(0o755)
+    monkeypatch.setenv("PATH", str(tools_dir))
+
+    cfg = _cfg(fake_home / ".cucoudle")
+    installer.install(cfg, python_executable="/usr/bin/python3")
+    assert cfg.home.exists()
+
+    result = installer.uninstall(cfg, purge_home=True)
+    assert result["homeRemoved"] is True
+    assert not cfg.home.exists()
+    assert BLOCK_START not in (fake_home / ".zshrc").read_text()
+
+
+def test_uninstall_without_purge_keeps_home(tmp_path, monkeypatch):
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+    monkeypatch.setenv("PATH", str(tmp_path))
+
+    cfg = _cfg(fake_home / ".cucoudle")
+    cfg.save()  # create the home/config
+    result = installer.uninstall(cfg, purge_home=False)
+    assert result["homeRemoved"] is False
+    assert cfg.home.exists()

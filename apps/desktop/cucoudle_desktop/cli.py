@@ -104,12 +104,26 @@ def cmd_install(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_uninstall(cfg: Config, args: argparse.Namespace) -> int:
-    result = run_uninstall(cfg)
-    print("Cucoudle shell integration removed.")
+    # Stop the running daemon first so no stale process/socket lingers.
+    stopped = False
+    try:
+        resp = control_request(cfg, "shutdown", timeout=4)
+        stopped = bool(resp.get("ok"))
+    except ConnectionError:
+        pass
+
+    result = run_uninstall(cfg, purge_home=args.purge)
+    print("Cucoudle uninstalled.")
+    print(f"  Daemon:               {'stopped' if stopped else 'was not running'}")
     if result["removed"]:
-        print("  Removed shims: " + ", ".join(result["removed"]))
+        print("  Removed shims:        " + ", ".join(result["removed"]))
     if result["shellFiles"]:
-        print("  Cleaned shell files: " + ", ".join(result["shellFiles"]))
+        print("  Cleaned shell config: " + ", ".join(result["shellFiles"]))
+    if result.get("homeRemoved"):
+        print(f"  Removed home:         {cfg.home}")
+    elif not args.purge:
+        print(f"  Kept config/logs in:  {cfg.home}  (use --purge to remove everything)")
+    print("\nOpen a new terminal for the PATH change to take effect.")
     return 0
 
 
@@ -219,7 +233,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("daemon", help="run the daemon (PTY bridge + relay client)")
     sub.add_parser("install", help="install shims and shell PATH block")
-    sub.add_parser("uninstall", help="remove shims and shell PATH block")
+    p_uninstall = sub.add_parser("uninstall", help="stop the daemon and remove shims and shell PATH block")
+    p_uninstall.add_argument("--purge", action="store_true",
+                             help="also delete the entire ~/.cucoudle home (config, logs)")
     sub.add_parser("doctor", help="report integration state")
     p_pair = sub.add_parser("pair", help="create a pairing code and show a QR")
     p_pair.add_argument("--ttl", type=int, default=300, help="pairing code TTL in seconds")

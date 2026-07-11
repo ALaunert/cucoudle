@@ -41,6 +41,7 @@ class Daemon:
         self._decoders: dict[str, codecs.IncrementalDecoder] = {}
         self.paired_devices: list[dict] = []
         self._log_fh = None
+        self._stop_event: asyncio.Event | None = None
 
     # ---- logging -------------------------------------------------------
     def log(self, message: str) -> None:
@@ -61,10 +62,17 @@ class Daemon:
         self._server = await asyncio.start_unix_server(self._handle_conn, path=str(sock_path))
         os.chmod(sock_path, 0o600)
         await self.relay.start()
+        self._stop_event = asyncio.Event()
         self.log(f"daemon listening on {sock_path}")
         self.log(f"relay target: {self.cfg.relay_url}  desktopId={self.cfg.desktop_id}")
         async with self._server:
-            await self._server.serve_forever()
+            serve_task = asyncio.ensure_future(self._server.serve_forever())
+            stop_task = asyncio.ensure_future(self._stop_event.wait())
+            try:
+                await asyncio.wait({serve_task, stop_task}, return_when=asyncio.FIRST_COMPLETED)
+            finally:
+                serve_task.cancel()
+                stop_task.cancel()
 
     async def shutdown(self) -> None:
         self.log("shutting down")
@@ -267,6 +275,11 @@ class Daemon:
         if method == "pairing.create":
             ttl = int(params.get("ttlSeconds", 300))
             return await self.relay.create_pairing(ttl)
+        if method == "shutdown":
+            # Defer the stop so this response flushes to the caller first.
+            if self._stop_event is not None:
+                asyncio.get_running_loop().call_later(0.2, self._stop_event.set)
+            return {"stopping": True}
         raise ProtocolException("UNSUPPORTED_METHOD", f"unknown control method '{method}'")
 
     # ---- relay-forwarded mobile requests ------------------------------

@@ -221,10 +221,16 @@ def install(cfg: Config, python_executable: str | None = None) -> dict:
     }
 
 
-def uninstall(cfg: Config) -> dict:
+def uninstall(cfg: Config, purge_home: bool = False) -> dict:
+    """Remove shims and the shell PATH block. With *purge_home*, also delete the
+    entire Cucoudle home (config, logs, shims) for a pristine state."""
     removed = remove_shims(cfg)
     changed_files = clean_shell_config(cfg)
-    return {"removed": removed, "shellFiles": changed_files}
+    home_removed = False
+    if purge_home and cfg.home.exists():
+        shutil.rmtree(cfg.home, ignore_errors=True)
+        home_removed = not cfg.home.exists()
+    return {"removed": removed, "shellFiles": changed_files, "homeRemoved": home_removed}
 
 
 def doctor(cfg: Config) -> dict:
