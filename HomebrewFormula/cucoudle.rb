@@ -10,6 +10,7 @@ class Cucoudle < Formula
   url "https://github.com/ALaunert/cucoudle/archive/refs/tags/v0.1.4.tar.gz"
   sha256 "ca4ac06c9c4b86167b96f4092c83ab684256e4e3e8e60f1b5f0f7b5d015512ec"
   license "MIT"
+  revision 1
   head "https://github.com/ALaunert/cucoudle.git", branch: "main"
 
   depends_on "pydantic"
@@ -23,6 +24,16 @@ class Cucoudle < Formula
   resource "websockets" do
     url "https://files.pythonhosted.org/packages/8c/02/b9a097e1e16fee4e2fd1ec8c39f6a9c5d6257bae8fa12640caf869f54436/websockets-16.1.tar.gz"
     sha256 "299468cbe42e2b9981134c7c51d99387d8a7bf562b00183b3eec53f882846dad"
+  end
+
+  resource "pyte" do
+    url "https://files.pythonhosted.org/packages/ab/ab/b599762933eba04de7dc5b31ae083112a6c9a9db15b01d3109ad797559d9/pyte-0.8.2.tar.gz"
+    sha256 "5af970e843fa96a97149d64e170c984721f20e52227a2f57f0a54207f08f083f"
+  end
+
+  resource "wcwidth" do
+    url "https://files.pythonhosted.org/packages/34/74/c6428f875774288bec1396f5bfcbc2d925700a4dad61727fd5f2b12f249d/wcwidth-0.8.2.tar.gz"
+    sha256 "91fbef97204b96a3d4d421609b80340b760cf33e26da123ff243d76b1fda8dda"
   end
 
   def install
