@@ -13,7 +13,9 @@ The `alexey` account did not have sudo or Docker socket access when this setup
 was prepared. Do not put its SSH password in this repository or in compose
 environment files.
 
-## Install
+## Operator deployment
+
+This is performed by a server administrator and repeated only for service updates. It is not part of desktop or mobile installation and is never run by end users.
 
 Run as an administrator on the server:
 

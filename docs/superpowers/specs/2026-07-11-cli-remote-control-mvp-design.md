@@ -101,7 +101,7 @@ Required shim behavior:
 
 ## Backend relay component
 
-The relay is a TypeScript service using Fastify and WebSockets.
+The relay is a centrally hosted, always-on TypeScript service using Fastify and WebSockets. It is product infrastructure, not an end-user application: desktop/mobile installers never install, start, stop, update, or uninstall the relay. Cucoudle operators deploy and update one shared service behind TLS, health checks, monitoring and an automatic restart policy. Local `npm run relay` exists only for development and tests.
 
 Responsibilities:
 
@@ -113,7 +113,7 @@ Responsibilities:
 - emit clear errors for offline desktop, invalid pairing, and expired pairing.
 - negotiate the intersection of mobile, relay and desktop capabilities during pair/resume.
 
-For MVP, relay state can be in memory. If the relay restarts, active pairings and connections may be lost. Durable storage is a later concern.
+For MVP, relay state can be in memory. If the process restarts, active pairings and connections may be lost and clients reconnect. This is acceptable for the hackathon but not sufficient for production reliability; durable credentials/revocation and multi-instance routing are operator-side follow-up work.
 
 ## Mobile component
 

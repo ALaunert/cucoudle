@@ -13,13 +13,17 @@
 - [Protocol contracts](docs/protocol-contracts.md) — контракты backend/mobile, desktop/backend и desktop/mobile через relay.
 - [Relay deployment](deploy/relay/README.md) — Docker + Nginx deployment на `relay.launert.dev`.
 
-## Relay (срез разработчика 3)
+## Hosted relay
+
+Production relay — один централизованный always-on сервис команды Cucoudle. Пользователь не устанавливает и не удаляет его вместе с desktop/mobile приложениями. Клиенты знают публичный endpoint `wss://relay.launert.dev`; deployment, обновления, TLS, monitoring и restart policy выполняют только операторы сервиса.
+
+### Local relay development
 
 Требуется Node.js 20+.
 
 ```bash
 npm install
-npm run relay              # relay на ws://localhost:8787
+npm run relay              # локальный relay на ws://localhost:8787
 npm test                   # прогон protocol + relay
 ```
 

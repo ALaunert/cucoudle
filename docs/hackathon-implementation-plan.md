@@ -11,7 +11,7 @@
 5. На iOS/Android приложении появляется список активных сессий.
 6. Пользователь с телефона открывает сессию, видит вывод терминала и отправляет ввод.
 
-Главный принцип MVP: пользователь не должен помнить отдельную команду-обертку. Обертки, PTY, relay и синхронизацию берет на себя desktop-приложение.
+Главный принцип MVP: пользователь не должен помнить отдельную команду-обертку или настраивать инфраструктуру. Обертки и PTY берет на себя desktop-приложение; mobile и desktop автоматически подключаются к единому hosted relay, который постоянно работает и обслуживается командой Cucoudle отдельно от клиентских установок.
 
 ## Не входит в MVP
 
@@ -55,6 +55,8 @@
 - custom UI components для sessions, terminal и timeline
 
 ### Backend / Relay
+
+Lifecycle: один централизованный always-on hosted service. Relay не входит в desktop/mobile installer и не имеет пользовательских install/uninstall flows. Команды `npm run relay` предназначены только для локальной разработки; production управляется operator deployment, restart policy, TLS, health checks и monitoring.
 
 - Node.js 20+
 - TypeScript

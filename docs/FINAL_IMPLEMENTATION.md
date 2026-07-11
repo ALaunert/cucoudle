@@ -54,6 +54,7 @@ Cucoudle — мобильное приложение для удалённого
 - MVP интегрируется с CLI-агентами через desktop-daemon и shell-shims, запускающие реальный CLI в PTY; сырой терминальный вывод зеркалится на мобилу (нативные Claude/Codex SDK — вне MVP);
 - транспорт мобила↔десктоп: WebSocket через relay-брокер; формат — versioned JSON-envelope (`request`/`response`/`event`);
 - desktop — источник правды по сессиям; relay — тонкий брокер pairing/presence/форвардинга и transcript не хранит;
+- relay является централизованной always-on инфраструктурой Cucoudle: его один раз разворачивают и обновляют операторы, он не входит в пользовательские install/uninstall lifecycle desktop и mobile;
 - авторизация пары: одноразовый pairing-код (QR) + `mobileSessionToken` для reconnect.
 - целевой input contract двухуровневый: универсальный terminal parity (`text`, `raw`, arbitrary `bytes`, named `keys` + modifiers) и structured interactions для approval, confirmation, choices и text prompts;
 - semantic Approve/Reject UI создается только desktop provider adapter с exact PTY binding; неизвестные prompt всегда остаются доступны через raw terminal fallback.
@@ -87,6 +88,7 @@ Cucoudle — мобильное приложение для удалённого
 - desktop-daemon пока без tray/GUI и без персистентности сессий в SQLite между рестартами;
 - daemon autostart/login item пока не устанавливается автоматически: текущий CLI setup все еще просит один раз запустить `cucoudle daemon`;
 - relay in-memory: при рестарте pairing и `mobileSessionToken` теряются;
+- production relay должен работать под process/container supervisor с automatic restart, health checks, TLS и monitoring; подготовленный Compose уже задает `restart: unless-stopped`, но deployment пока не активирован;
 - конфигурация удаленного TLS endpoint подготовлена, но не применена на сервере из-за отсутствия административных прав у SSH-учетки;
 - desktop endpoint пока не аутентифицируется device secret; end-to-end шифрование, ключи и ревокация устройств отложены;
 - запуск через Expo Go описан проектно и не подтверждён фактическим запуском на устройстве.

@@ -293,3 +293,17 @@
 **Решения, ограничения и проблемы:** Для запуска на физическом Expo Go выбран SDK 54. Mobile component tests планируются на Jest/`jest-expo` + React Native Testing Library, а существующие protocol/relay tests остаются на Vitest. Параллельные lane-агенты не выполняют Git-операции в общей рабочей копии; commit/push делает только оркестратор на wave boundary. Реализация mobile-кода ещё не начата.
 
 **Следующий шаг:** Выполнить Task 1 плана — scaffold `apps/mobile`, mobile test harness и первый проверенный запуск Expo Go.
+
+## 2026-07-11 — Разделение hosted relay и клиентских lifecycle
+
+**Цель:** Явно зафиксировать, что серверная часть является постоянно работающей инфраструктурой, а не третьим приложением для установки пользователем.
+
+**Сделано:** README, архитектурная спека, implementation plan и deployment guide теперь разделяют production hosted relay и локальный development relay. Desktop/mobile installers только подключаются к встроенному public endpoint и никогда не устанавливают, запускают, обновляют или удаляют backend. Server administrator выполняет operator deployment и последующие обновления отдельно.
+
+**Затронутые компоненты:** Только lifecycle/deployment документация; runtime код не менялся.
+
+**Проверки:** Compose подтверждает always-on policy `restart: unless-stopped`; health endpoints, TLS proxy и operator commands описаны в deployment bundle. Публичная проверка по-прежнему показывает, что actual `relay.launert.dev` еще не направлен в Cucoudle relay.
+
+**Решения, ограничения и проблемы:** Hosted lifecycle учтен в target architecture. Это не означает, что production уже работает: текущий remote virtual host возвращает Vite `403`, а in-memory state и отсутствие device authentication пока не соответствуют полноценному production режиму.
+
+**Следующий шаг:** Администратору развернуть один shared relay service, включить Nginx WSS routing/monitoring и проверить desktop/mobile connections; пользовательские installers при этом не меняются.
