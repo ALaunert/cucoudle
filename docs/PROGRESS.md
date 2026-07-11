@@ -748,3 +748,17 @@
 **Решения, ограничения и проблемы:** Interrupt удалён только из пользовательского экрана, поэтому wire-контракт и runtime API остаются совместимыми и действие можно вернуть в более подходящем overflow/menu сценарии. Фактическая композиция с длинным multiline-текстом и системной клавиатурой ещё не проверена на физическом устройстве после этой правки.
 
 **Следующий шаг:** На iPhone проверить empty/typing/pending/error состояния composer, рост до нескольких строк и видимость стрелки над клавиатурой; при необходимости отдельно спроектировать редкое interrupt-действие в overflow-меню.
+
+## 2026-07-11 — Уточнение документации splash-фаз
+
+**Цель:** Исправить границу доказанного для двухфазного мобильного splash и сохранить хронологию предыдущего инкремента без переписывания.
+
+**Сделано:** Документация уточняет фактическое различие фаз: native splash показывает только локальный PNG на тёмном фоне, а React-фаза использует тот же PNG и отдельно добавляет wordmark `Cucoudle`, tagline `AI CODING AGENTS · ONE CHAT` и progress indicator. Технически подтверждены только разрешение native-конфигурации Expo и component contract React-фазы; визуальная идентичность или плавность перехода не заявляется.
+
+**Затронутые компоненты:** `docs/superpowers/specs/2026-07-11-mobile-splash-screen-design.md`, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
+
+**Проверки:** Свежий полный mobile Jest — 26/26 suites, 170/170 tests, 0 snapshots, exit 0; `npm run typecheck` (`tsc --noEmit`) — exit 0; `npx expo config --type public --json` — exit 0 и разрешает точные значения `splash.backgroundColor = #07111E`, `splash.image = ./assets/splash-icon.png`, `splash.resizeMode = contain`; `git diff --check` — успешно.
+
+**Решения, ограничения и проблемы:** Визуальный переход native → React, фактический масштаб изображения и отсутствие светлой вспышки в release-сборке на физическом iPhone/Android по-прежнему не проверены.
+
+**Следующий шаг:** Выполнить startup smoke release-сборки на физических iPhone и Android и зафиксировать первый кадр, масштаб изображения и переход между splash-фазами.
