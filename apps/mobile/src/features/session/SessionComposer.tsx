@@ -1,8 +1,14 @@
 import type { SessionInputParams } from "@cucoudle/protocol";
 import { useRef, useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
-import { AppButton } from "../../ui/components/AppButton";
 import { colors, radii, spacing, typography } from "../../ui/theme";
 
 export type SendSessionInput = (
@@ -29,6 +35,7 @@ export function SessionComposer({
   const [error, setError] = useState<string>();
   const pendingRef = useRef(false);
   const controlsDisabled = disabled || pending;
+  const sendDisabled = controlsDisabled || draft.length === 0;
 
   async function send() {
     if (disabled || pendingRef.current || draft.length === 0) return;
@@ -54,7 +61,7 @@ export function SessionComposer({
 
   return (
     <View style={styles.container}>
-      <View style={styles.row}>
+      <View style={styles.field} testID="session-composer-field">
         <TextInput
           accessibilityLabel="Команда"
           editable={!controlsDisabled}
@@ -65,14 +72,30 @@ export function SessionComposer({
           style={styles.input}
           value={draft}
         />
-        <AppButton
-          disabled={controlsDisabled || draft.length === 0}
-          label="Отправить"
-          loading={pending}
-          loadingLabel="Отправка…"
+        <Pressable
+          accessibilityLabel={pending ? "Отправка…" : "Отправить"}
+          accessibilityRole="button"
+          accessibilityState={{ busy: pending, disabled: sendDisabled }}
+          disabled={sendDisabled}
           onPress={() => void send()}
+          style={({ pressed }) => [
+            styles.send,
+            sendDisabled && !pending && styles.sendDisabled,
+            pressed && !sendDisabled && styles.sendPressed,
+          ]}
           testID="session-send"
-        />
+        >
+          {pending ? (
+            <ActivityIndicator color={colors.primaryText} size="small" />
+          ) : (
+            <Text
+              style={[styles.sendIcon, sendDisabled && styles.sendIconDisabled]}
+              testID="session-send-icon"
+            >
+              ↑
+            </Text>
+          )}
+        </Pressable>
       </View>
       {error ? (
         <Text accessibilityLiveRegion="polite" style={styles.error}>
@@ -85,19 +108,41 @@ export function SessionComposer({
 
 const styles = StyleSheet.create({
   container: { gap: spacing.xs },
-  row: { flexDirection: "row", alignItems: "flex-end", gap: spacing.sm },
-  input: {
-    flex: 1,
-    minHeight: 44,
-    maxHeight: 120,
+  field: {
+    position: "relative",
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radii.control,
     backgroundColor: colors.surface,
+  },
+  input: {
+    minHeight: 52,
+    maxHeight: 120,
     color: colors.text,
     fontSize: typography.body,
     paddingHorizontal: spacing.md,
+    paddingRight: spacing.xxl + spacing.md,
     paddingVertical: spacing.sm,
   },
+  send: {
+    position: "absolute",
+    right: 4,
+    bottom: 4,
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+  },
+  sendPressed: { backgroundColor: colors.primaryPressed },
+  sendDisabled: { backgroundColor: colors.disabled },
+  sendIcon: {
+    color: colors.primaryText,
+    fontSize: 24,
+    fontWeight: "800",
+    lineHeight: 26,
+  },
+  sendIconDisabled: { color: colors.disabledText },
   error: { color: colors.destructive, fontSize: typography.caption },
 });

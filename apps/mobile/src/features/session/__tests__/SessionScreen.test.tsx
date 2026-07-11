@@ -1,5 +1,5 @@
 import type { EventMessage, Session } from "@cucoudle/protocol";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 
 import { sessionReducer } from "../../../state/sessionReducer";
 import {
@@ -51,7 +51,6 @@ function renderScreen(
     state,
     connectionStatus: "online",
     onSendInput: jest.fn().mockResolvedValue({ accepted: true }),
-    onInterrupt: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   };
   const view = render(<SessionScreen {...props} />);
@@ -112,7 +111,6 @@ test("stops controls after session.ended", () => {
 
   expect(screen.getByText("Сессия завершена (код 0)")).toBeVisible();
   expect(screen.getByLabelText("Команда")).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Прервать" })).toBeDisabled();
 });
 
 test("shows an unavailable state after session.removed", () => {
@@ -147,33 +145,19 @@ test("navigates back to the session list from the header and unavailable state",
   expect(onBack).toHaveBeenCalledTimes(2);
 });
 
-test("interrupts exactly once while pending and disables offline controls", async () => {
-  let resolveInterrupt!: () => void;
-  const pending = new Promise<void>((resolve) => { resolveInterrupt = resolve; });
-  const onInterrupt = jest.fn(() => pending);
+test("disables the composer while offline", () => {
   const state = subscribed({ session: session(), mode: "live" });
-  const { rerender, props } = renderScreen(state, { onInterrupt });
 
-  const interrupt = screen.getByRole("button", { name: "Прервать" });
-  fireEvent.press(interrupt);
-  fireEvent.press(interrupt);
-  expect(onInterrupt).toHaveBeenCalledTimes(1);
-  expect(onInterrupt).toHaveBeenCalledWith({ sessionId: "session-1" });
-  expect(interrupt).toBeDisabled();
+  renderScreen(state, { connectionStatus: "offline" });
 
-  resolveInterrupt();
-  await waitFor(() => expect(interrupt).toBeEnabled());
-  rerender(<SessionScreen {...props} state={state} connectionStatus="offline" />);
-  expect(screen.getByRole("button", { name: "Прервать" })).toBeDisabled();
   expect(screen.getByLabelText("Команда")).toBeDisabled();
 });
 
-test("keeps composer and interrupt read-only while connection is recovering", () => {
+test("keeps the composer read-only while connection is recovering", () => {
   const state = subscribed({ session: session(), mode: "live" });
 
   renderScreen(state, { connectionStatus: "recovery" });
 
-  expect(screen.getByRole("button", { name: "Прервать" })).toBeDisabled();
   expect(screen.getByLabelText("Команда")).toBeDisabled();
   expect(screen.getByText("Восстанавливаем связь")).toBeVisible();
 });
@@ -211,6 +195,12 @@ test("wraps the open session in a keyboard-aware frame", () => {
   const frame = screen.getByTestId("session-keyboard-frame");
   expect(frame).toBeVisible();
   expect(frame).toContainElement(screen.getByLabelText("Команда"));
+});
+
+test("does not show a separate interrupt control", () => {
+  renderScreen(subscribed({ session: session(), mode: "live" }));
+
+  expect(screen.queryByRole("button", { name: "Прервать" })).toBeNull();
 });
 
 test("plain terminal removes ANSI/control formatting but retains readable newlines", () => {

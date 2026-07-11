@@ -734,3 +734,17 @@
 **Решения, ограничения и проблемы:** Промежуточный вариант с `accessibilityRole="button"` на корне карточки давал дублирование accessible-кнопок (те самые четыре падения `AttentionCard.test.tsx`, зафиксированные в предыдущей записи как параллельные) — роль убрана, полный прогон снова зелёный. Тап на физическом устройстве ещё не проверялся.
 
 **Следующий шаг:** В общем device smoke проверить с вкладки «Входящие» переходы: тап по карточке waiting → открытая сессия, тап по строке активности → сессия, «Скрыть» не открывает сессию.
+
+## 2026-07-11 — Цельный composer без отдельной кнопки «Прервать»
+
+**Цель:** Упростить нижнюю часть открытой сессии после device-снимка: убрать конкурирующую destructive-кнопку и превратить поле ввода с отправкой в один визуальный элемент.
+
+**Сделано:** По выбранному HTML-макету A `SessionComposer` переделан в единый rounded-контейнер: multiline `TextInput` занимает всю ширину, а 44pt кнопка со стрелкой `↑` встроена справа снизу. Empty/offline/stopped состояния показывают приглушённую стрелку внутри поля вместо отдельного серого блока; pending-состояние показывает spinner, при этом прежняя защита от повторной отправки и сохранение draft при ошибке не изменены. `InterruptButton` удалён из session UI, его prop убран из `SessionScreen` и route; backend-метод interrupt оставлен в runtime/protocol вне UI. Сравнительный HTML-макет сохранён в `docs/session-composer-mockups.html`.
+
+**Затронутые компоненты:** `apps/mobile/src/features/session/{SessionComposer.tsx,SessionScreen.tsx,InterruptButton.tsx,__tests__/SessionComposer.test.tsx,__tests__/SessionScreen.test.tsx}`, `apps/mobile/src/app/session/[id].tsx`, `docs/session-composer-mockups.html`, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
+
+**Проверки:** Новые regression tests сначала зафиксировали старую композицию (отдельные input/send и видимый «Прервать»), затем focused composer/session suites прошли 30/30. Полный mobile Jest — 26 suites, 168/168; mobile TypeScript typecheck — успешно; Expo Doctor — 18/18; `git diff --check` — успешно.
+
+**Решения, ограничения и проблемы:** Interrupt удалён только из пользовательского экрана, поэтому wire-контракт и runtime API остаются совместимыми и действие можно вернуть в более подходящем overflow/menu сценарии. Фактическая композиция с длинным multiline-текстом и системной клавиатурой ещё не проверена на физическом устройстве после этой правки.
+
+**Следующий шаг:** На iPhone проверить empty/typing/pending/error состояния composer, рост до нескольких строк и видимость стрелки над клавиатурой; при необходимости отдельно спроектировать редкое interrupt-действие в overflow-меню.

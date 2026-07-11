@@ -82,3 +82,12 @@ test("does not send an empty draft", () => {
 
   expect(onSendInput).not.toHaveBeenCalled();
 });
+
+test("renders the send action inside one composer field", () => {
+  renderComposer();
+
+  const composer = screen.getByTestId("session-composer-field");
+  expect(composer).toContainElement(screen.getByLabelText("Команда"));
+  expect(composer).toContainElement(screen.getByRole("button", { name: "Отправить" }));
+  expect(screen.getByTestId("session-send-icon")).toHaveTextContent("↑");
+});

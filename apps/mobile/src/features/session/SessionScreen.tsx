@@ -15,7 +15,6 @@ import { EmptyState } from "../../ui/components/EmptyState";
 import { colors, spacing, typography } from "../../ui/theme";
 import { projectLabel } from "../sessions/SessionRow";
 import { hasRenderContent } from "../../state/renderBuffer";
-import { InterruptButton, type InterruptSession } from "./InterruptButton";
 import { PlainTerminal } from "./PlainTerminal";
 import { StyledTerminal } from "./StyledTerminal";
 import { SessionComposer, type SendSessionInput } from "./SessionComposer";
@@ -37,7 +36,6 @@ export type SessionScreenProps = {
   state: SessionState;
   connectionStatus: SessionConnectionStatus;
   onSendInput?: SendSessionInput;
-  onInterrupt?: InterruptSession;
   actionArea?: ReactNode;
   negotiatedCapabilities?: ReadonlySet<string>;
   structuredInteraction?: InteractionRequest;
@@ -77,7 +75,6 @@ export function SessionScreen({
   state,
   connectionStatus,
   onSendInput,
-  onInterrupt,
   actionArea,
   negotiatedCapabilities,
   structuredInteraction,
@@ -167,34 +164,19 @@ export function SessionScreen({
           ) : null)}
         </View>
 
-        <View style={styles.controls}>
-          {onInterrupt ? (
-            <InterruptButton
-              disabled={controlsDisabled}
-              onInterrupt={onInterrupt}
-              sessionId={sessionId}
-            />
-          ) : (
-            <InterruptButton
-              disabled
-              onInterrupt={async () => undefined}
-              sessionId={sessionId}
-            />
-          )}
-          {onSendInput ? (
-            <SessionComposer
-              disabled={controlsDisabled}
-              onSendInput={onSendInput}
-              sessionId={sessionId}
-            />
-          ) : (
-            <SessionComposer
-              disabled
-              onSendInput={async () => ({ accepted: false })}
-              sessionId={sessionId}
-            />
-          )}
-        </View>
+        {onSendInput ? (
+          <SessionComposer
+            disabled={controlsDisabled}
+            onSendInput={onSendInput}
+            sessionId={sessionId}
+          />
+        ) : (
+          <SessionComposer
+            disabled
+            onSendInput={async () => ({ accepted: false })}
+            sessionId={sessionId}
+          />
+        )}
       </AppScreen>
     </SessionKeyboardFrame>
   );
@@ -230,5 +212,4 @@ const styles = StyleSheet.create({
   connection: { color: colors.textMuted, fontSize: typography.caption },
   stopped: { color: colors.textMuted, fontSize: typography.caption },
   actionArea: { minHeight: 0 },
-  controls: { gap: spacing.sm },
 });

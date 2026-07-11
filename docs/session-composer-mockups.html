@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cucoudle — варианты поля ввода</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111e;
+      --surface: #111e2e;
+      --raised: #18283a;
+      --border: #26384d;
+      --text: #f4f7fa;
+      --muted: #9dabbc;
+      --mint: #74e8bd;
+      --mint-dark: #062117;
+      --activity: #69afff;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(105, 175, 255, .10), transparent 28rem),
+        #030914;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    header {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 42px 24px 18px;
+    }
+    h1 { margin: 0 0 8px; font-size: clamp(26px, 4vw, 40px); }
+    header p { margin: 0; color: var(--muted); font-size: 16px; }
+
+    main {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(280px, 1fr));
+      gap: 26px;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 24px 24px 56px;
+    }
+
+    .option { min-width: 0; }
+    .option-head {
+      min-height: 86px;
+      padding: 0 4px 14px;
+    }
+    .option-head strong {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 17px;
+    }
+    .badge {
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(116, 232, 189, .14);
+      color: var(--mint);
+      font-size: 11px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .option-head p { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+    .phone {
+      position: relative;
+      min-height: 700px;
+      overflow: hidden;
+      border: 1px solid #29405a;
+      border-radius: 38px;
+      background: var(--bg);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .38), inset 0 0 0 5px #050b13;
+    }
+    .statusbar {
+      display: flex;
+      justify-content: space-between;
+      padding: 17px 24px 10px;
+      color: #dce6ef;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .screen {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      height: 430px;
+      padding: 12px 20px 14px;
+    }
+    .back { color: var(--mint); font-size: 12px; font-weight: 800; }
+    .session-head { display: flex; justify-content: space-between; gap: 12px; }
+    .eyebrow { color: var(--mint); font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+    .session-head h2 { margin: 4px 0 4px; font-size: 21px; }
+    .project, .connection { color: var(--muted); font-size: 11px; }
+    .state { color: var(--activity); font-size: 11px; font-weight: 800; text-align: right; }
+    .connection { margin-top: 5px; text-align: right; }
+    .terminal {
+      flex: 1;
+      min-height: 0;
+      padding: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      background: #030912;
+      color: #b9c4d1;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      line-height: 1.55;
+    }
+    .term-line { height: 2px; margin: 0 0 11px; border-radius: 2px; background: #4a5668; }
+    .term-line.short { width: 48%; }
+    .term-line.long { width: 92%; }
+    .prompt {
+      margin-top: 20px;
+      padding: 10px;
+      border-left: 2px solid var(--mint);
+      background: #343236;
+      color: #e8edf2;
+      white-space: nowrap;
+    }
+    .model { margin-top: 6px; color: #aeb9c6; }
+
+    .composer {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    .field {
+      min-height: 48px;
+      flex: 1;
+      padding: 13px 15px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .send-circle {
+      width: 48px;
+      height: 48px;
+      flex: 0 0 48px;
+      border: 0;
+      border-radius: 17px;
+      background: var(--mint);
+      color: var(--mint-dark);
+      font-size: 23px;
+      font-weight: 900;
+    }
+    .send-circle:disabled {
+      background: #273444;
+      color: #718096;
+    }
+
+    .composer.inset {
+      position: relative;
+      display: block;
+    }
+    .composer.inset .field { padding-right: 58px; }
+    .composer.inset .send-circle {
+      position: absolute;
+      right: 5px;
+      bottom: 5px;
+      width: 38px;
+      height: 38px;
+      border-radius: 14px;
+      font-size: 19px;
+    }
+
+    .commandbar {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      min-height: 50px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 17px;
+      background: var(--surface);
+    }
+    .chevron { padding-left: 15px; color: var(--mint); font-family: ui-monospace, monospace; font-weight: 900; }
+    .commandbar .placeholder { padding: 0 10px; color: var(--muted); font-size: 14px; }
+    .send-text {
+      align-self: stretch;
+      padding: 0 16px;
+      border: 0;
+      border-left: 1px solid var(--border);
+      background: var(--raised);
+      color: var(--mint);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .keyboard {
+      height: 270px;
+      padding: 10px 7px 22px;
+      border-top: 1px solid #777;
+      background: #4a4a4d;
+    }
+    .suggestions { display: flex; justify-content: space-around; height: 35px; color: #eee; font-size: 12px; }
+    .keys { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; }
+    .key {
+      height: 37px;
+      border-radius: 6px;
+      background: #68686b;
+      box-shadow: 0 1px 0 #242426;
+    }
+    .key.space { grid-column: span 5; }
+    .key.wide { grid-column: span 2; }
+
+    .note {
+      margin: 14px 4px 0;
+      padding: 12px 14px;
+      border: 1px solid rgba(116, 232, 189, .18);
+      border-radius: 14px;
+      background: rgba(17, 30, 46, .62);
+      color: #c8d3df;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; max-width: 430px; }
+      .option-head { min-height: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Поле ввода открытой сессии</h1>
+    <p>Три варианта без отдельной кнопки «Прервать». Терминал отдаёт место клавиатуре, composer остаётся внизу.</p>
+  </header>
+  <main>
+    <section class="option">
+      <div class="option-head">
+        <strong>Вариант A <span class="badge">рекомендую</span></strong>
+        <p>Одно цельное поле, отправка встроена внутрь. Самая спокойная и мобильная композиция.</p>
+      </div>
+      <div class="phone">
+        <div class="statusbar"><span>15:20</span><span>▥ ᯤ 78%</span></div>
+        <div class="screen">
+          <div class="back">← Сессии</div>
+          <div class="session-head">
+            <div><div class="eyebrow">CODEX</div><h2>Codex · launert</h2><div class="project">launert</div></div>
+            <div><div class="state">running</div><div class="connection">Подключено</div></div>
+          </div>
+          <div class="terminal">
+            <div class="term-line long"></div><div class="term-line long"></div><div class="term-line short"></div>
+            <div class="prompt">› improve documentation in @filename</div><div class="model">gpt-5.6-sol high · ~</div>
+          </div>
+          <div class="composer inset">
+            <div class="field">Введите команду</div>
+            <button class="send-circle" aria-label="Отправить" disabled>↑</button>
+          </div>
+        </div>
+        <div class="keyboard"><div class="suggestions"><span>Я</span><span>Ну</span><span>Да</span></div><div class="keys">
+          <i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i>
+          <i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i>
+          <i class="key wide"></i><i class="key space"></i><i class="key wide"></i>
+        </div></div>
+      </div>
+      <div class="note">Кнопка активируется только при наличии текста. В disabled-состоянии остаётся внутри поля и не создаёт отдельный серый блок.</div>
+    </section>
+
+    <section class="option">
+      <div class="option-head">
+        <strong>Вариант B</strong>
+        <p>Поле и квадратная кнопка рядом. Чуть яснее действие, но композиция визуально тяжелее.</p>
+      </div>
+      <div class="phone">
+        <div class="statusbar"><span>15:20</span><span>▥ ᯤ 78%</span></div>
+        <div class="screen">
+          <div class="back">← Сессии</div>
+          <div class="session-head">
+            <div><div class="eyebrow">CODEX</div><h2>Codex · launert</h2><div class="project">launert</div></div>
+            <div><div class="state">running</div><div class="connection">Подключено</div></div>
+          </div>
+          <div class="terminal">
+            <div class="term-line long"></div><div class="term-line long"></div><div class="term-line short"></div>
+            <div class="prompt">› improve documentation in @filename</div><div class="model">gpt-5.6-sol high · ~</div>
+          </div>
+          <div class="composer">
+            <div class="field">Введите команду</div>
+            <button class="send-circle" aria-label="Отправить">↑</button>
+          </div>
+        </div>
+        <div class="keyboard"><div class="suggestions"><span>Я</span><span>Ну</span><span>Да</span></div><div class="keys">
+          <i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i>
+          <i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i>
+          <i class="key wide"></i><i class="key space"></i><i class="key wide"></i>
+        </div></div>
+      </div>
+      <div class="note">Хороший компромисс, если хочется явно отделить ввод от действия. Стрелка экономит ширину по сравнению с текстом «Отправить».</div>
+    </section>
+
+    <section class="option">
+      <div class="option-head">
+        <strong>Вариант C</strong>
+        <p>Компактная terminal-команда: prompt слева и текстовая отправка справа.</p>
+      </div>
+      <div class="phone">
+        <div class="statusbar"><span>15:20</span><span>▥ ᯤ 78%</span></div>
+        <div class="screen">
+          <div class="back">← Сессии</div>
+          <div class="session-head">
+            <div><div class="eyebrow">CODEX</div><h2>Codex · launert</h2><div class="project">launert</div></div>
+            <div><div class="state">running</div><div class="connection">Подключено</div></div>
+          </div>
+          <div class="terminal">
+            <div class="term-line long"></div><div class="term-line long"></div><div class="term-line short"></div>
+            <div class="prompt">› improve documentation in @filename</div><div class="model">gpt-5.6-sol high · ~</div>
+          </div>
+          <div class="commandbar">
+            <span class="chevron">›</span><span class="placeholder">Введите команду</span><button class="send-text">Отправить</button>
+          </div>
+        </div>
+        <div class="keyboard"><div class="suggestions"><span>Я</span><span>Ну</span><span>Да</span></div><div class="keys">
+          <i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i>
+          <i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i><i class="key"></i>
+          <i class="key wide"></i><i class="key space"></i><i class="key wide"></i>
+        </div></div>
+      </div>
+      <div class="note">Выглядит технически и подходит терминальному продукту, но текстовая кнопка забирает место у длинных команд.</div>
+    </section>
+  </main>
+</body>
+</html>

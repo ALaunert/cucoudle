@@ -36,7 +36,6 @@ export default function SessionRoute() {
         else router.replace("/(tabs)/sessions" as never);
       }}
       negotiatedCapabilities={app.negotiatedCapabilities}
-      onInterrupt={app.interruptSession}
       onOpenSession={app.openSession}
       onRespondInteraction={app.respondInteraction}
       onSendInput={app.sendInput}
