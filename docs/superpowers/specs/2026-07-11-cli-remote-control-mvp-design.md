@@ -10,7 +10,7 @@ The hackathon MVP proves the core loop across macOS, Linux, iOS, and Android:
 - ordinary CLI commands create managed sessions;
 - phone pairs with desktop through a relay;
 - mobile app lists active sessions;
-- user can read output, send input, interrupt, and switch between sessions.
+- user can read the same terminal state, send text or terminal keys, answer approvals and choices, interrupt, and switch between sessions.
 
 ## Scope
 
@@ -27,7 +27,7 @@ The feature is intentionally scoped to CLI processes. Sessions launched inside C
 - No control of Claude Desktop, Cursor Desktop, IDE extension sessions, or arbitrary GUI windows.
 - No Accessibility, Screen Recording, or GUI automation permissions.
 - No production-grade App Store or Play Store distribution.
-- No complete terminal emulator requirement for the first demo.
+- No requirement to finish every ANSI/alternate-screen edge case in the first demo; raw terminal data and full input fallback must still be preserved.
 - No semantic parsing of every agent-specific TUI state.
 - No native Codex app-server, Claude SDK, or Cursor cloud adapter in the MVP.
 - No durable multi-server relay persistence.
@@ -85,7 +85,9 @@ Responsibilities:
 - expose local launch/control APIs to shims;
 - create and manage PTY-backed sessions;
 - mirror terminal output to both the local terminal and mobile transport;
-- forward mobile input, interrupts, and resize events into the PTY;
+- forward text, raw bytes, named keys, interrupts, and resize events into the PTY;
+- detect supported Claude/Codex/Cursor prompts and bind structured interactions to exact PTY responses;
+- reject stale interaction responses rather than sending input to a newer prompt;
 - keep local session metadata and recent events in SQLite;
 - connect to the relay as the paired desktop device.
 
@@ -121,16 +123,23 @@ Responsibilities:
 - maintain relay WebSocket connection;
 - show a sessions list with agent, title, cwd, status, and last activity;
 - show a session detail screen with streaming terminal output;
-- send text input to a selected session;
+- render structured approvals, confirmations, choice lists and text prompts when desktop emits them;
+- send text, named terminal keys, arbitrary raw input and structured interaction responses;
 - send interrupt commands;
 - switch between multiple active sessions;
 - show offline, reconnecting, and ended states.
 
-The first UI can be a practical raw terminal/timeline hybrid. It does not need perfect full-screen TUI rendering to satisfy the MVP.
+The session screen is a terminal/timeline hybrid. It always shows the terminal stream and composer, adds a terminal keyboard accessory for Escape, Tab, Ctrl, arrows and Enter, and overlays native interaction controls when a safe desktop binding exists. Structured controls never replace terminal access.
+
+Terminal parity and semantic UI are separate guarantees:
+
+- terminal parity is universal and provider-independent: UTF-8 text, exact raw bytes, named keys/modifiers, terminal resize and ANSI/VT output;
+- semantic UI is adapter-driven: Approve/Reject, allow once/session, options and text prompts are shown only for recognized prompt states;
+- unknown prompts remain fully operable through terminal input, so a parser gap cannot block the user.
 
 ## Shared protocol
 
-All subsystems exchange typed JSON messages. The shared TypeScript protocol package owns event names and field names; the desktop side mirrors those models with Pydantic. Detailed backend/mobile, desktop/backend, and desktop/mobile contracts are defined in `docs/protocol-contracts.md`.
+All subsystems exchange typed JSON messages. The shared TypeScript protocol package owns event names and field names; the desktop side mirrors those models with Pydantic. `session.input` covers text/raw/bytes/keys. `interaction.requested`, `interaction.updated`, `interaction.respond`, and `interaction.resolved` cover native approval, choice and text UI. Detailed contracts are defined in `docs/protocol-contracts.md`.
 
 Core session model:
 
@@ -211,6 +220,11 @@ Mobile sends input to a stopped session:
 - desktop rejects the command with a structured error;
 - mobile disables the composer for that session.
 
+Interaction is no longer current:
+
+- desktop rejects the response with `INTERACTION_STALE` or `INTERACTION_NOT_FOUND`;
+- mobile refreshes the active interaction from `session.subscribe` and does not retry automatically.
+
 PTY exits:
 
 - desktop emits `session.ended`;
@@ -254,6 +268,8 @@ Desktop:
 
 - unit-test binary discovery and shim config generation;
 - integration-test PTY launch with `bash`;
+- contract-test text/raw/bytes/named-key input and modifier mappings;
+- fixture-test each provider approval/choice detector and stale interaction rejection;
 - verify fallback when daemon is stopped;
 - smoke-test `claude`, `codex`, and Cursor command names where installed.
 
@@ -266,6 +282,8 @@ Relay:
 Mobile:
 
 - component-test sessions list and session detail with mocked events;
+- component-test approval, reject, single/multi choice, text response and terminal fallback states;
+- verify interaction actions are disabled after send and restored correctly after reconnect;
 - manual iOS and Android test with relay;
 - verify reconnect and stopped-session UI states.
 
@@ -276,7 +294,9 @@ End-to-end demo:
 - pair mobile;
 - run a CLI command through shim;
 - see the session on mobile;
-- send input from mobile;
+- send text and terminal keys from mobile;
+- answer one Approve/Reject or option prompt with native controls, with terminal fallback visible;
+- verify the answer reaches the intended current PTY prompt exactly once;
 - switch between two active sessions.
 
 ## Implementation plan pointer

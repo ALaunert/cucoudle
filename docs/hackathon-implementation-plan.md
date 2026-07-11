@@ -206,6 +206,10 @@ export type Session = {
 - `session.subscribe`
 - `terminal.output`
 - `session.input`
+- `interaction.requested`
+- `interaction.updated`
+- `interaction.respond`
+- `interaction.resolved`
 - `session.interrupt`
 - `session.ended`
 
@@ -274,6 +278,8 @@ docs/*desktop*
 5. Реализовать `install-shims`, `uninstall-shims`, `doctor`.
 6. Стримить `session.created`, `terminal.output`, `session.ended`.
 7. Подключить desktop daemon к relay.
+8. Расширить `session.input` режимами `text`, `raw`, `bytes`, `keys` и корректным mapping named keys/modifiers в PTY.
+9. Добавить provider-specific interaction detectors/bindings для approval, confirmation, choices и text prompts; хранить binding только на desktop и отклонять stale responses.
 
 Готовность для MVP:
 
@@ -281,6 +287,8 @@ docs/*desktop*
 - терминал продолжает работать как обычно;
 - mobile получает live output;
 - input с mobile попадает в PTY;
+- Enter/Escape/Tab, arrows, Ctrl/Alt combinations и arbitrary bytes с mobile попадают в PTY без искажения;
+- распознанный approval/choice отображается структурированно и выбранный ответ применяется ровно к текущему prompt;
 - Ctrl+C работает локально и с mobile.
 
 ### Разработчик 2: Mobile Frontend
@@ -301,6 +309,8 @@ apps/mobile/
 - session detail;
 - raw terminal view;
 - composer;
+- structured interaction panel для Approve/Reject, confirmations, options и text responses;
+- terminal keyboard accessory для Escape, Tab, Ctrl, arrows и Enter;
 - local mobile state;
 - визуальные состояния сессий.
 
@@ -312,8 +322,10 @@ apps/mobile/
 4. Реализовать `SessionsScreen`.
 5. Реализовать `SessionScreen`.
 6. Реализовать terminal output renderer.
-7. Реализовать composer и отправку `session.input`.
-8. Реализовать action buttons: interrupt, reconnect, clear local buffer.
+7. Реализовать composer и все режимы `session.input`: text submit, raw/bytes fallback и named keys.
+8. Реализовать structured interaction state и `interaction.respond`: approval actions, single/multi select, text и cancel.
+9. Реализовать action buttons: interrupt, reconnect, clear local buffer.
+10. Добавить terminal keyboard accessory и доступ к raw terminal mode без скрытия transcript.
 
 Готовность для MVP:
 
@@ -321,7 +333,9 @@ apps/mobile/
 - видит список сессий;
 - открывает сессию;
 - показывает streaming terminal output;
-- отправляет ввод в desktop PTY.
+- отправляет text, terminal keys и raw input в desktop PTY;
+- показывает Approve/Reject и варианты ответа для `interaction.requested`;
+- после reconnect восстанавливает `activeInteraction` через `session.subscribe`.
 
 ### Разработчик 3: Backend / Relay / Android / Linux Integration
 
@@ -383,6 +397,7 @@ Desktop принимает:
 
 - mobile commands;
 - session input;
+- structured interaction responses;
 - interrupt;
 - resize.
 
@@ -398,6 +413,8 @@ Mobile отправляет:
 - session list;
 - subscribe;
 - input;
+- named keys/raw bytes;
+- interaction response;
 - interrupt.
 
 Mobile принимает:
@@ -405,6 +422,7 @@ Mobile принимает:
 - session list result;
 - session events;
 - terminal output;
+- interaction requested/updated/resolved;
 - errors.
 
 Владелец контракта: Backend / Relay.
@@ -418,6 +436,9 @@ Mobile принимает:
 - Mobile может cache output локально, но после reconnect запрашивает session list и последние события у desktop.
 - Если desktop offline, mobile показывает состояние `offline`, а не пытается реконструировать session.
 - Если daemon умер, shim fallback запускает real CLI без remote control.
+- Structured interaction является optional enhancement конкретного provider adapter; terminal input остается обязательным fallback.
+- Approve/Reject нельзя строить по low-confidence text match. Desktop должен хранить exact response binding и проверять, что prompt не устарел.
+- Relay не интерпретирует choices и approvals, а только прозрачно форвардит contract messages.
 
 ## План реализации
 
@@ -501,14 +522,20 @@ bash
 7. Открыть сессию на телефоне.
 8. Отправить ввод с телефона.
 9. Показать, что ввод появился в локальной CLI-сессии.
-10. Запустить вторую сессию `codex` или `agent`.
-11. Переключиться между сессиями на телефоне.
+10. Показать approval или choice prompt: нажать Approve/Reject либо выбрать вариант и подтвердить, что сработал правильный текущий prompt.
+11. Показать terminal fallback: Escape/arrow/Enter или raw input с телефона.
+12. Запустить вторую сессию `codex` или `agent`.
+13. Переключиться между сессиями на телефоне.
 
 ## Риски
 
 ### PTY/TUI rendering
 
-Некоторые CLI рисуют full-screen TUI, используют escape sequences и alternate screen. Для MVP можно показывать raw output stream. Более точный terminal renderer добавляется позже.
+Некоторые CLI рисуют full-screen TUI, используют escape sequences и alternate screen. Raw stream и exact terminal input должны сохраняться всегда. Первый renderer может поддерживать не все визуальные edge cases, но line-only view не считается полной CLI parity; ANSI/VT rendering, cursor state, alternate screen и resize входят в продуктовый target.
+
+### Semantic prompt detection
+
+Claude, Codex и Cursor меняют формулировки и клавиши approval/choice prompts. Generic text parsing не может безопасно гарантировать mapping. Поэтому каждый structured interaction требует provider-specific detector, тестовый fixture и локальный exact response binding. При неизвестном или неоднозначном состоянии mobile показывает terminal fallback без approval buttons.
 
 ### Shell integration
 

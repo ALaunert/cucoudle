@@ -10,6 +10,8 @@ This document defines the MVP contracts between:
 
 The relay is a transport and pairing broker. The desktop daemon is the source of truth for CLI sessions. The mobile app is a client that renders desktop state and sends user actions.
 
+This document is the target product contract. The currently implemented subset supports terminal output, UTF-8 `text/raw` input, interrupt and resize. The `bytes`, `keys`, and structured interaction additions below are specified but require follow-up changes in `packages/protocol`, desktop adapters, relay allowlists and mobile UI before they are considered implemented.
+
 ## Ownership
 
 | Area | Owner | Source of truth |
@@ -116,6 +118,8 @@ export type ErrorCode =
   | "TOOL_NOT_FOUND"
   | "DAEMON_UNAVAILABLE"
   | "PTY_WRITE_FAILED"
+  | "INTERACTION_NOT_FOUND"
+  | "INTERACTION_STALE"
   | "INTERNAL_ERROR";
 ```
 
@@ -371,6 +375,7 @@ export type SessionSubscribeResult = {
   events?: EventMessage[];
   terminalBuffer?: string;
   lastSeq?: number;
+  activeInteraction?: InteractionRequest;
 };
 ```
 
@@ -384,6 +389,9 @@ export type DesktopEventName =
   | "session.updated"
   | "session.removed"
   | "terminal.output"
+  | "interaction.requested"
+  | "interaction.updated"
+  | "interaction.resolved"
   | "session.ended";
 ```
 
@@ -552,11 +560,46 @@ Forwarding rule:
 
 Relay may reject before forwarding when desktop is offline or mobile is not paired.
 
+Forwarded mobile methods include session methods and `interaction.respond`. The relay does not inspect, translate, approve, reject, or persist interaction content.
+
 ## Desktop <-> Mobile logical contract
 
 The mobile app does not talk directly to desktop in the remote MVP. The logical contract still belongs to desktop and mobile; relay only forwards it.
 
 ### Session input
+
+`session.input` is the universal PTY write method. It has four additive modes so the phone can reproduce every input available in the local CLI while existing `text` and `raw` clients remain compatible.
+
+```ts
+export type TerminalModifier = "ctrl" | "alt" | "shift" | "meta";
+
+export type TerminalKeyName =
+  | "enter" | "escape" | "tab" | "backspace" | "delete" | "insert"
+  | "arrowUp" | "arrowDown" | "arrowLeft" | "arrowRight"
+  | "home" | "end" | "pageUp" | "pageDown" | "space"
+  | "f1" | "f2" | "f3" | "f4" | "f5" | "f6"
+  | "f7" | "f8" | "f9" | "f10" | "f11" | "f12";
+
+export type TerminalKeyStroke = {
+  key: TerminalKeyName | { character: string };
+  modifiers?: TerminalModifier[];
+};
+
+export type SessionInputParams =
+  | { sessionId: string; inputMode: "text"; data: string; submit?: boolean }
+  | { sessionId: string; inputMode: "raw"; data: string }
+  | { sessionId: string; inputMode: "bytes"; dataBase64: string }
+  | { sessionId: string; inputMode: "keys"; keys: TerminalKeyStroke[] };
+```
+
+Mode rules:
+
+- `text` is composer input. With `submit: true`, desktop appends the PTY Enter sequence if needed. `submit` defaults to `false` for compatibility with clients that already append a newline.
+- `raw` writes the UTF-8 bytes of `data` exactly. Control and escape characters may be represented with JSON Unicode escapes.
+- `bytes` base64-decodes and writes arbitrary bytes exactly. This is the terminal-parity fallback when UTF-8 is insufficient.
+- `keys` maps named keys and modifiers to the sequence appropriate for the desktop PTY. It covers navigation, function keys, Ctrl/Alt/Shift/Meta combinations, Enter, Escape, Tab, Backspace and Delete.
+
+The normal composer uses `text`; a terminal keyboard accessory uses `keys`; provider adapters and advanced terminal mode may use `raw` or `bytes`. Mobile must not automatically retry input because duplicate bytes are user-visible.
 
 Mobile request:
 
@@ -569,7 +612,8 @@ Mobile request:
   "params": {
     "sessionId": "sess_1",
     "data": "continue with the minimal implementation\\n",
-    "inputMode": "text"
+    "inputMode": "text",
+    "submit": true
   },
   "sentAt": "2026-07-11T10:01:00Z"
 }
@@ -590,10 +634,165 @@ Desktop response:
 }
 ```
 
-`inputMode` values:
+Legacy `inputMode` behavior shown in the request above:
 
 - `text`: app composer input; mobile should append `\n` when sending a submitted message;
 - `raw`: terminal-mode input; mobile sends exact bytes represented as a string.
+
+Those two bullets describe the legacy payload shown above. New clients should use `submit: true` for composer submission and may also use `bytes` and `keys`. Successful responses may include `bytesWritten`. `accepted: true` only means input reached the active PTY; it does not mean the CLI accepted the semantic answer.
+
+Named-key example:
+
+```json
+{
+  "version": "2026-07-11",
+  "kind": "request",
+  "id": "req_keys_1",
+  "method": "session.input",
+  "params": {
+    "sessionId": "sess_1",
+    "inputMode": "keys",
+    "keys": [
+      { "key": "arrowDown" },
+      { "key": "enter" }
+    ]
+  },
+  "sentAt": "2026-07-11T10:01:10Z"
+}
+```
+
+### Structured CLI interactions
+
+Raw terminal parity is always available. Known CLI prompts should additionally render as native mobile controls. Desktop provider adapters or high-confidence prompt detectors emit an interaction only when they can deterministically map a response back to the current PTY prompt.
+
+```ts
+export type InteractionKind =
+  | "approval"
+  | "confirmation"
+  | "singleSelect"
+  | "multiSelect"
+  | "text";
+
+export type InteractionOptionIntent =
+  | "approve"
+  | "approveOnce"
+  | "approveSession"
+  | "reject"
+  | "cancel"
+  | "neutral";
+
+export type InteractionOption = {
+  id: string;
+  label: string;
+  description?: string;
+  intent: InteractionOptionIntent;
+  shortcut?: string;
+  disabled?: boolean;
+};
+
+export type InteractionRequest = {
+  id: string;
+  sessionId: string;
+  kind: InteractionKind;
+  prompt: string;
+  details?: string;
+  options?: InteractionOption[];
+  allowsText: boolean;
+  allowsTerminalInput: true;
+  sensitive?: boolean;
+  createdAt: string;
+  terminalSeq?: number;
+};
+```
+
+Desktop event example:
+
+```json
+{
+  "version": "2026-07-11",
+  "kind": "event",
+  "event": "interaction.requested",
+  "data": {
+    "interaction": {
+      "id": "int_42",
+      "sessionId": "sess_1",
+      "kind": "approval",
+      "prompt": "Allow Claude to run npm test?",
+      "details": "npm test",
+      "options": [
+        { "id": "approve_once", "label": "Allow once", "intent": "approveOnce" },
+        { "id": "approve_session", "label": "Allow for session", "intent": "approveSession" },
+        { "id": "reject", "label": "Reject", "intent": "reject" }
+      ],
+      "allowsText": true,
+      "allowsTerminalInput": true,
+      "createdAt": "2026-07-11T10:02:00Z",
+      "terminalSeq": 130
+    }
+  },
+  "sentAt": "2026-07-11T10:02:00Z"
+}
+```
+
+Mobile renders approval intents as Approve/Reject actions, select options as a list, and `allowsText` as a composer. Labels come from desktop because Claude, Codex and Cursor may offer different choices such as allow once, allow for session, deny, or provide feedback.
+
+```ts
+export type InteractionResponse =
+  | { type: "options"; optionIds: string[] }
+  | { type: "text"; text: string; submit?: boolean }
+  | { type: "cancel" };
+
+export type InteractionRespondParams = {
+  sessionId: string;
+  interactionId: string;
+  response: InteractionResponse;
+};
+```
+
+Mobile response example:
+
+```json
+{
+  "version": "2026-07-11",
+  "kind": "request",
+  "id": "req_interaction_1",
+  "method": "interaction.respond",
+  "params": {
+    "sessionId": "sess_1",
+    "interactionId": "int_42",
+    "response": {
+      "type": "options",
+      "optionIds": ["approve_once"]
+    }
+  },
+  "sentAt": "2026-07-11T10:02:05Z"
+}
+```
+
+Desktop validates that the interaction is current, translates the response using a binding stored only on desktop, writes the exact PTY input, and returns `{ "accepted": true }`. It then emits `interaction.resolved` with `interactionId`, `sessionId`, `resolution` and optional selected option IDs. `interaction.updated` replaces prompt/options without changing the interaction ID.
+
+```ts
+export type InteractionUpdatedData = {
+  interaction: InteractionRequest;
+};
+
+export type InteractionResolvedData = {
+  interactionId: string;
+  sessionId: string;
+  resolution: "answered" | "cancelled" | "superseded" | "sessionEnded";
+  optionIds?: string[];
+  resolvedAt: string;
+};
+```
+
+Rules:
+
+- Relay never guesses or generates an interaction response; it only forwards messages.
+- Desktop rejects unknown interactions with `INTERACTION_NOT_FOUND` and prompts superseded by terminal state with `INTERACTION_STALE`.
+- Mobile disables actions immediately after sending and never automatically retries them.
+- Raw terminal controls and `session.input` remain available while a structured interaction is visible.
+- Unknown or low-confidence prompts stay terminal-only. An unverified text match must never produce an approval button.
+- For `sensitive: true`, mobile must not persist, log, notify, or preview the answer. Until end-to-end encryption exists, adapters should avoid exposing password or secret prompts as structured remote interactions.
 
 ### Session interrupt
 
@@ -658,7 +857,7 @@ Mobile reconnect:
 2. Mobile sends `mobile.resume` with the stored `mobileSessionToken`.
 3. Mobile sends `session.list`.
 4. For open session detail screens, mobile sends `session.subscribe` with the last seen `seq`.
-5. Desktop responds with replay, snapshot, or live mode.
+5. Desktop responds with replay, snapshot, or live mode and the current `activeInteraction`, if one still exists.
 
 Desktop reconnect:
 
@@ -680,6 +879,8 @@ Relay preserves message order within a single WebSocket connection. It does not 
 Desktop assigns `seq` to terminal events. Mobile uses `seq` only for display recovery, not for command de-duplication.
 
 Request `id` should be unique per client process. If a response is lost, mobile may retry idempotent requests such as `session.list` and `session.subscribe`. Mobile should not blindly retry `session.input` because duplicate input would be user-visible.
+
+`interaction.respond` is also non-idempotent. A lost response is resolved by re-subscribing and checking `activeInteraction`, never by automatically resending the approval or choice.
 
 The MVP relay preserves request IDs when forwarding. It allows only one in-flight request with a given `id` per desktop. A concurrent duplicate is rejected with `INVALID_MESSAGE`; this prevents a response from being routed to the wrong mobile connection without rewriting the desktop/mobile envelope.
 
@@ -711,10 +912,20 @@ Mobile session detail requires:
 
 - current `Session`;
 - live `terminal.output` events;
+- current `activeInteraction` plus `interaction.requested`, `interaction.updated`, and `interaction.resolved` events;
 - `session.ended` event;
 - structured errors for input failure.
 
-Mobile may display raw terminal output as plain monospaced text for MVP. ANSI rendering is a frontend enhancement, not a protocol requirement.
+The product terminal view must preserve the information available in the CLI: ANSI/VT styling, carriage returns, cursor movement, alternate-screen redraws and terminal dimensions. The mobile implementation may initially ship a simpler renderer, but it must always keep the raw stream and expose terminal input controls; plain line-oriented text is not considered full CLI parity.
+
+When an active interaction exists, mobile renders it above the composer as native controls:
+
+- approval/confirmation: intent-colored Approve, Reject, Allow once, Allow for session, Cancel actions as provided by `options`;
+- single/multi select: option list with descriptions and disabled state;
+- text: composer with a clear submit command;
+- terminal fallback: keyboard accessory with Escape, Tab, Ctrl, arrows and Enter, plus access to the full software keyboard.
+
+Structured controls must not hide or replace the terminal transcript. The user can always inspect the exact CLI prompt and switch to raw terminal input.
 
 ## Compatibility rules
 
@@ -737,7 +948,12 @@ The hackathon demo is complete when these messages work end to end:
 - `session.subscribe`
 - `terminal.output`
 - `session.input`
+- `interaction.requested`
+- `interaction.respond`
+- `interaction.resolved`
 - `session.interrupt`
 - `session.ended`
+
+The `session.input` demo must cover composer submit, named navigation/control keys and exact raw or base64 bytes. The structured interaction demo must cover at least one approval and one choice/text response while the terminal fallback remains usable.
 
 Reconnect polish is covered by `mobile.resume`, but it is not required for the first end-to-end demo.

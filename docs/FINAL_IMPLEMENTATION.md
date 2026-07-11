@@ -53,10 +53,12 @@ Cucoudle — мобильное приложение для удалённого
 - транспорт мобила↔десктоп: WebSocket через relay-брокер; формат — versioned JSON-envelope (`request`/`response`/`event`);
 - desktop — источник правды по сессиям; relay — тонкий брокер pairing/presence/форвардинга и transcript не хранит;
 - авторизация пары: одноразовый pairing-код (QR) + `mobileSessionToken` для reconnect.
+- целевой input contract двухуровневый: универсальный terminal parity (`text`, `raw`, arbitrary `bytes`, named `keys` + modifiers) и structured interactions для approval, confirmation, choices и text prompts;
+- semantic Approve/Reject UI создается только desktop provider adapter с exact PTY binding; неизвестные prompt всегда остаются доступны через raw terminal fallback.
 
 ### Ещё не реализовано
 
-Мобильное Expo-приложение (`apps/mobile`) пока отсутствует, поэтому канал пока проверен через технический WebSocket mobile-клиент. Не сделаны: tray/settings UI на desktop, персистентность сессий в SQLite между рестартами и production-безопасность (end-to-end шифрование, ключи устройств). Deployment bundle подготовлен, но еще не активирован на сервере: доступная SSH-учетка не имеет административных прав на Docker и Nginx.
+Мобильное Expo-приложение (`apps/mobile`) пока отсутствует, поэтому канал пока проверен через технический WebSocket mobile-клиент. Расширенные `session.input` modes (`bytes`, `keys`) и structured interaction events/method пока только специфицированы: shared Zod/Pydantic schemas, desktop mappings/detectors, relay allowlist и mobile controls еще не реализованы. Также не сделаны tray/settings UI, SQLite persistence и production security. Deployment bundle подготовлен, но не активирован: доступная SSH-учетка не имеет административных прав на Docker и Nginx.
 
 ## Процесс разработки
 
@@ -85,7 +87,7 @@ Cucoudle — мобильное приложение для удалённого
 
 ## Следующие шаги
 
-1. Подключить mobile data layer к уже проверенному desktop↔relay контракту и повторить сквозной сценарий из Expo-приложения.
-2. Разработчику 2 — реализовать Expo-приложение (pairing по QR, список сессий, детальный экран с терминалом, composer) поверх `@cucoudle/protocol`.
-3. Проверить канал на реальных desktop+mobile, затем на Android и Linux.
-4. На desktop добавить tray/settings UI и персистентность сессий в SQLite; при необходимости поднять публичный адрес/tunnel для relay для удалённого demo «не за рабочим компом».
+1. Реализовать additive protocol schemas для input modes и structured interactions в TypeScript/Pydantic, затем обновить relay allowlist.
+2. Добавить desktop key/bytes mapping и первый provider interaction adapter с stale-response protection.
+3. Реализовать в Expo terminal keyboard, Approve/Reject, choices, text response и raw fallback; повторить полный E2E.
+4. Проверить настоящие Claude/Codex/Cursor prompts на macOS/Linux и iOS/Android.

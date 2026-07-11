@@ -183,3 +183,17 @@
 **Решения, ограничения и проблемы:** Контракт и транспорт desktop↔relay совместимы без дополнительных правок. Проверялся весь управляющий путь, но агентский бинарь был детерминированным `/bin/cat`, а mobile UI — техническим WebSocket-клиентом. Настоящие Claude/Codex/Cursor и Expo-приложение остаются следующей проверкой.
 
 **Следующий шаг:** Повторить тот же сценарий из Expo mobile data layer, затем проверить настоящую Claude или Codex CLI-сессию.
+
+## 2026-07-11 — Контракт полного CLI input и structured interactions
+
+**Цель:** Зафиксировать, что мобильный клиент должен уметь не только отправлять строку, но и полноценно отвечать на approvals, confirmations, choices и любой terminal input, доступный в CLI.
+
+**Сделано:** `docs/protocol-contracts.md` расширен четырьмя additive режимами `session.input`: `text`, `raw`, base64 `bytes` и named `keys` с modifiers. Добавлен structured interaction lifecycle: `interaction.requested`, `interaction.updated`, `interaction.respond`, `interaction.resolved`, модель options/intents для Approve/Reject/Allow once/Allow session/cancel, text responses, reconnect через `activeInteraction` и stale/unknown errors. Обновлены product spec, frontend rendering requirements, ownership, implementation tasks, demo и risk model.
+
+**Затронутые компоненты:** Только спецификации и актуальная документация: `docs/protocol-contracts.md`, CLI MVP design, hackathon implementation plan, `docs/FINAL_IMPLEMENTATION.md`, `docs/PROGRESS.md`. Runtime-код не изменялся.
+
+**Проверки:** Контракты сверены по направлениям mobile→relay→desktop и desktop→relay→mobile; сохранена backward compatibility существующих `text/raw` payloads; raw terminal fallback остается обязательным при отсутствии semantic detector.
+
+**Решения, ограничения и проблемы:** Terminal parity является универсальной гарантией, structured UI — provider-specific enhancement. Relay не интерпретирует approvals. Desktop показывает semantic action только при exact local response binding и отклоняет stale interaction. Новые schemas, daemon handling, relay allowlist и mobile UI еще не реализованы и явно отмечены как implementation gap.
+
+**Следующий шаг:** Реализовать shared schemas и relay allowlist, затем desktop key mapping/provider detector и mobile interaction controls отдельными зонами ответственности.
