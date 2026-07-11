@@ -2,6 +2,7 @@ import { z } from "zod";
 import { MobileDeviceSchema, SessionSchema } from "./sessions";
 import { EventMessageSchema } from "./envelope";
 import { InteractionRequestSchema } from "./events";
+import { TerminalRenderSnapshotSchema } from "./terminalRender";
 
 export const MOBILE_METHODS = [
   "mobile.pair",
@@ -77,6 +78,7 @@ export const SessionSubscribeResultSchema = z.object({
   terminalBuffer: z.string().optional(),
   lastSeq: z.number().optional(),
   activeInteraction: InteractionRequestSchema.optional(),
+  terminalRender: TerminalRenderSnapshotSchema.optional(),
 });
 
 // session.input has four additive PTY-write modes. text/raw stay

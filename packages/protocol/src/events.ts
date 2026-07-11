@@ -6,6 +6,7 @@ export const DESKTOP_EVENTS = [
   "session.updated",
   "session.removed",
   "terminal.output",
+  "terminal.render",
   "interaction.requested",
   "interaction.updated",
   "interaction.resolved",
