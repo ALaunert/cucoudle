@@ -8,6 +8,7 @@ services:
       RELAY_MOBILE_URL: "wss://relay.launert.dev/v1/ws/mobile"
       MOBILE_SESSION_TTL_SECONDS: "28800"
       DESKTOP_RESPONSE_TIMEOUT_MS: "15000"
+      RELAY_LOG_INPUT_TEXT: "true"
     ports:
       - "127.0.0.1:8787:8787"
     read_only: true

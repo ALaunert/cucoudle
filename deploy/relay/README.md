@@ -71,6 +71,24 @@ cd /home/alexey/services/cucoudle-relay
 ./deploy.sh ghcr.io/alaunert/cucoudle-relay:sha-<known-good-commit>
 ```
 
+## Operational logs
+
+Relay writes one JSON object per protocol action to stdout. Logs always contain
+routing metadata (`desktopId`, `mobileDeviceId`, method/event, request/session
+IDs, byte counts and result). Pairing codes and tokens are never logged.
+
+`RELAY_LOG_INPUT_TEXT=true` additionally records text from `session.input` and
+`interaction.respond` as `inputText`. It is enabled in the current test
+deployment and must be disabled for normal production where terminal text is
+sensitive.
+
+```bash
+docker logs --since 10m cucoudle-relay-relay-1
+docker logs -f cucoudle-relay-relay-1 | grep --line-buffered 'mobile.request.forwarded'
+```
+
+Container log rotation and retention are managed by the host Docker daemon.
+
 Desktop uses `wss://relay.launert.dev`; the daemon appends
 `/v1/ws/desktop`. Mobile uses the QR-provided
 `wss://relay.launert.dev/v1/ws/mobile` URL.

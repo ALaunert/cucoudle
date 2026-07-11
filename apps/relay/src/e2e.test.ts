@@ -54,7 +54,11 @@ function resp(id: string, result: Record<string, unknown>) {
 
 describe("minimum demo contract end to end", () => {
   it("runs register → pair → list → subscribe → output → input → ended", async () => {
-    app = buildApp("ws://127.0.0.1/v1/ws/mobile");
+    const auditEntries: Array<{ event: string; fields: Record<string, unknown> }> = [];
+    app = buildApp("ws://127.0.0.1/v1/ws/mobile", {
+      auditLog: (event, fields = {}) => auditEntries.push({ event, fields }),
+      logInputText: true,
+    });
     await app.listen({ port: 0, host: "127.0.0.1" });
     const addr = app.server.address();
     if (addr === null || typeof addr === "string") throw new Error("no port");
@@ -101,6 +105,19 @@ describe("minimum demo contract end to end", () => {
     expect(inputAck.result.accepted).toBe(true);
     const ended = await mRead((m) => m.kind === "event" && m.event === "session.ended");
     expect(ended.data.exitCode).toBe(0);
+
+    expect(auditEntries).toContainEqual({
+      event: "mobile.request.forwarded",
+      fields: expect.objectContaining({
+        desktopId: "desk_1",
+        mobileDeviceId: "mob_a",
+        method: "session.input",
+        requestId: "m4",
+        sessionId: "sess_1",
+        inputText: "continue\n",
+      }),
+    });
+    expect(JSON.stringify(auditEntries)).not.toContain(code);
 
     desktop.close();
     mobile.close();

@@ -445,3 +445,17 @@
 **Решения, ограничения и проблемы:** Mutating requests отправляются только online и никогда не retry автоматически. Неопределённый результат `interaction.respond` остаётся заблокированным до свежего interaction object, чтобы не дублировать решение. Structured controls скрыты без negotiated capability, сохраняя raw terminal fallback. Полный Expo runtime/E2E и физический iPhone smoke относятся к Task 14; zero-vulnerability audit gate остаётся открытым из-за несовместимого автоматического upgrade.
 
 **Следующий шаг:** Выполнить Task 14: production runtime composition, сквозной mobile flow/integration smoke, Expo doctor и проверку на физическом iPhone.
+
+## 2026-07-11 — Privacy-safe relay audit logging
+
+**Цель:** Сделать удалённые desktop/mobile проверки наблюдаемыми на production без записи пользовательских команд и секретов.
+
+**Сделано:** Relay получил injectable audit logger и production JSON stdout logger. Журналируются WebSocket connection lifecycle, desktop registration/pairing creation, mobile pair/resume, forwarded request/response, desktop event fan-out, timeout и invalid envelope. Базовые поля ограничены routing metadata: role, desktop/mobile/session/request IDs, method/event, byte counts, platform/app version и result. По запросу команды текущий test deployment включает `RELAY_LOG_INPUT_TEXT=true`: для `session.input` и text response `interaction.respond` добавляется `inputText`. Pairing code и mobile token не записываются. Deployment guide дополнен командами просмотра Docker logs.
+
+**Затронутые компоненты:** `apps/relay/src/audit.ts`, `app.ts`, `handlers.ts`, relay E2E test, `deploy/relay/README.md` и актуальная документация. Desktop и mobile runtime не менялись.
+
+**Проверки:** Core suite — 53 passed; core TypeScript typecheck и `git diff --check` — успешно. E2E проверяет наличие metadata и `inputText` для `session.input` при включённом test flag.
+
+**Решения, ограничения и проблемы:** Логи предназначены для тестирования маршрутизации и эксплуатации, а не для transcript storage. Input logging является явным временным режимом и должен быть выключен после тестов, поскольку terminal text может содержать чувствительные данные. Остальные params payload не журналируются.
+
+**Следующий шаг:** Развернуть через активный relay pipeline, отправить тестовый запрос с другого компьютера и подтвердить его по production JSON log.
