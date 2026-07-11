@@ -56,19 +56,30 @@ function renderScreen(
   return props;
 }
 
-test("shows all sessions newest first and derives project labels from Unix and Windows cwd", () => {
+test("pins waiting sessions above newer sessions and derives project labels from Unix and Windows cwd", () => {
   renderScreen();
 
   const rows = screen.getAllByTestId(/session-row-/);
   expect(rows.map((row) => row.props.testID)).toEqual([
+    "session-row-waiting",
     "session-row-running",
     "session-row-stopped",
-    "session-row-waiting",
     "session-row-error",
     "session-row-starting",
   ]);
   expect(screen.getByText("mobile-app")).toBeVisible();
   expect(screen.getByLabelText("Статус: starting")).toBeVisible();
+});
+
+test("makes a waiting session visually and accessibly explicit", () => {
+  renderScreen();
+
+  expect(screen.getByText("Ждёт вашего ответа")).toBeVisible();
+  expect(screen.getByLabelText("Статус: ждёт вашего ответа")).toBeVisible();
+  expect(screen.getByTestId("session-row-waiting")).toHaveStyle({
+    borderColor: "#DDA94E",
+    backgroundColor: "#352A18",
+  });
 });
 
 test("active filter includes starting, running, and waiting only", () => {

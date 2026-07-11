@@ -20,6 +20,11 @@ function newestFirst(left: Session, right: Session): number {
   return Date.parse(right.lastActivityAt) - Date.parse(left.lastActivityAt);
 }
 
+function waitingFirst(left: Session, right: Session): number {
+  const waitingPriority = Number(right.status === "waiting") - Number(left.status === "waiting");
+  return waitingPriority || newestFirst(left, right);
+}
+
 export function makeDismissalKey(session: Session): string {
   const base = `${session.id}:${session.status}:${session.lastActivityAt}`;
   return session.exitCode === undefined ? base : `${base}:${session.exitCode}`;
@@ -52,7 +57,7 @@ export function selectSessions(state: SessionState, filter: SessionFilter): Sess
       if (filter === "completed") return COMPLETED_STATUSES.has(session.status);
       return true;
     })
-    .sort(newestFirst);
+    .sort(waitingFirst);
 }
 
 export function selectRecentActivity(state: SessionState): ActivityFact[] {

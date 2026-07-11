@@ -27,14 +27,20 @@ function activityLabel(value: string): string {
 export function SessionRow({ session, onPress }: SessionRowProps) {
   const project = projectLabel(session.cwd);
   const activity = activityLabel(session.lastActivityAt);
+  const isWaiting = session.status === "waiting";
+  const statusLabel = isWaiting ? "Ждёт вашего ответа" : session.status;
 
   return (
     <Pressable
       accessibilityHint={`Открывает /session/${session.id}`}
-      accessibilityLabel={`${session.title}, ${session.agent}, ${project}, ${session.status}, ${activity}`}
+      accessibilityLabel={`${session.title}, ${session.agent}, ${project}, ${statusLabel}, ${activity}`}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.row,
+        isWaiting && styles.waitingRow,
+        pressed && styles.pressed,
+      ]}
       testID={`session-row-${session.id}`}
     >
       <View style={styles.heading}>
@@ -45,10 +51,12 @@ export function SessionRow({ session, onPress }: SessionRowProps) {
           </Text>
         </View>
         <View
-          accessibilityLabel={`Статус: ${session.status}`}
-          style={styles.status}
+          accessibilityLabel={`Статус: ${statusLabel.toLocaleLowerCase("ru-RU")}`}
+          style={[styles.status, isWaiting && styles.waitingStatus]}
         >
-          <Text style={styles.statusText}>{session.status}</Text>
+          <Text style={[styles.statusText, isWaiting && styles.waitingStatusText]}>
+            {statusLabel}
+          </Text>
         </View>
       </View>
       <View style={styles.meta}>
@@ -69,6 +77,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radii.card,
     backgroundColor: colors.surface,
+  },
+  waitingRow: {
+    borderColor: colors.attentionBorder,
+    backgroundColor: colors.attentionSurface,
   },
   pressed: { backgroundColor: colors.surfaceRaised },
   heading: {
@@ -97,11 +109,16 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.surfaceRaised,
   },
+  waitingStatus: {
+    borderColor: colors.attentionBorder,
+    backgroundColor: colors.attentionText,
+  },
   statusText: {
     color: colors.text,
     fontSize: typography.caption,
     fontWeight: "700",
   },
+  waitingStatusText: { color: colors.background },
   meta: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -67,24 +67,24 @@ describe("inboxSelectors", () => {
     );
   });
 
-  it("filters sessions and preserves stable newest-first order", () => {
+  it("filters sessions, pins waiting first, and keeps newest-first order within groups", () => {
     expect(selectSessions(state, "active").map((item) => item.id)).toEqual([
-      "starting",
-      "running",
       "waiting-new",
       "waiting-old",
+      "starting",
+      "running",
     ]);
     expect(selectSessions(state, "completed").map((item) => item.id)).toEqual([
       "stopped",
       "error",
     ]);
     expect(selectSessions(state, "all").map((item) => item.id)).toEqual([
+      "waiting-new",
+      "waiting-old",
       "starting",
       "running",
       "stopped",
       "error",
-      "waiting-new",
-      "waiting-old",
     ]);
   });
 
