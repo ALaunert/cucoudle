@@ -153,5 +153,11 @@ class TerminalRenderer:
             "lastSeq": self.seq,
         }
 
+    def screen_rows(self) -> list[str]:
+        """Plain-text rows of the current screen, laid out at their real
+        positions — the source alt-screen TUI prompt detection needs, since the
+        raw byte stream collapses cursor-addressed rows into one glued line."""
+        return list(self.screen.display)
+
     def resize(self, cols: int, rows: int) -> None:
         self.screen.resize(rows, cols)

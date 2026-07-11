@@ -27,7 +27,7 @@ from typing import Any
 from . import APP_VERSION
 from .config import MANAGED_ENV_FLAG, SESSION_ENV_VAR, Config
 from . import ipc
-from .interactions import detect_prompt, strip_ansi
+from .interactions import detect_prompt, detect_screen_prompt, strip_ansi
 from .protocol import ErrorCode, ProtocolException, SessionStatus, now_iso
 from .registry import SessionRegistry
 from .relay_client import RelayClient
@@ -338,7 +338,14 @@ class Daemon:
             return
         clean = strip_ansi(tail)
         ended_with_newline = clean.endswith("\n") or clean.endswith("\r")
-        detected = detect_prompt(tail, ended_with_newline)
+        # Alt-screen TUIs (Claude Code / codex select menus) collapse to one
+        # glued line in the raw tail, so detect off the rendered screen first;
+        # fall back to the raw line-oriented tiers for plain CLIs.
+        detected = None
+        if entry.renderer is not None:
+            detected = detect_screen_prompt(entry.renderer.screen_rows())
+        if detected is None:
+            detected = detect_prompt(tail, ended_with_newline)
         active = entry.active_interaction
         if detected is None:
             # Output settled past the prompt without a new one: the pending

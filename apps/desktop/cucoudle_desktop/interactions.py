@@ -46,6 +46,16 @@ _PROMPT_CHARS = ("?", ":", ">", "❯")  # ? : > ❯
 # A password/secret prompt should be flagged sensitive.
 _SENSITIVE_RE = re.compile(r"pass(?:word|phrase)|secret|token|api[_ -]?key", re.IGNORECASE)
 
+# --- Alt-screen TUI menu detection (Claude Code / codex select prompts) ---
+# These prompts are drawn with absolute cursor positioning, so the raw byte
+# tail is useless; detection runs on the rendered screen rows instead.
+_MENU_FOOTER_RE = re.compile(r"enter to select|to navigate|esc to cancel|↑/↓|↑ ↓", re.IGNORECASE)
+_SEL_MARKERS = "❯>»▶●➤"
+_SCREEN_OPTION_RE = re.compile(rf"^\s*([{_SEL_MARKERS}])?\s*(\d{{1,3}})[.)]\s+(\S.*)$")
+_ARROW_DOWN = b"\x1b[B"
+_ARROW_UP = b"\x1b[A"
+_ENTER = b"\r"
+
 
 def strip_ansi(text: str) -> str:
     """Remove ANSI/CSI escape sequences so raw PTY text can be pattern-matched."""
@@ -223,4 +233,65 @@ def _detect_text(prompt_line: str) -> Optional[DetectedPrompt]:
         allows_text=True,
         sensitive=bool(_SENSITIVE_RE.search(stripped)),
         option_bytes={},
+    )
+
+
+def detect_screen_prompt(rows: list[str]) -> Optional[DetectedPrompt]:
+    """Detect an alt-screen numbered-select menu from rendered screen rows.
+
+    Anchored on the navigation footer (``Enter to select · ↑/↓ to navigate``)
+    that Claude Code / codex draw under a select prompt, so plain numbered lists
+    in normal output are not mistaken for a menu. Options can be interleaved with
+    description lines; every numbered row above the footer is an option. The
+    answer for each option navigates from the currently selected (``❯``) entry to
+    the target with arrow keys, then Enter — matching the footer's own controls.
+    """
+    footer_idx = next((i for i, r in enumerate(rows) if _MENU_FOOTER_RE.search(r)), None)
+    if footer_idx is None:
+        return None
+
+    entries: list[tuple[str, str]] = []
+    selected = 0
+    first_entry_row: Optional[int] = None
+    for i in range(footer_idx):
+        m = _SCREEN_OPTION_RE.match(rows[i])
+        if m is None:
+            continue
+        marker, num, label = m.group(1), m.group(2), m.group(3).strip()
+        if marker:
+            selected = len(entries)
+        if first_entry_row is None:
+            first_entry_row = i
+        entries.append((num, label))
+
+    if len(entries) < 2:
+        return None
+
+    question: Optional[str] = None
+    if first_entry_row is not None:
+        for j in range(first_entry_row - 1, -1, -1):
+            s = rows[j].strip()
+            if not s:
+                continue
+            if s[-1] in ("?", ":"):
+                question = s
+            break
+
+    options: list[InteractionOption] = []
+    option_bytes: dict[str, bytes] = {}
+    for idx, (num, label) in enumerate(entries):
+        oid = f"option_{num}"
+        options.append(
+            InteractionOption(id=oid, label=label, intent=InteractionOptionIntent.NEUTRAL, shortcut=num)
+        )
+        delta = idx - selected
+        nav = (_ARROW_DOWN * delta) if delta > 0 else (_ARROW_UP * -delta)
+        option_bytes[oid] = nav + _ENTER
+
+    return DetectedPrompt(
+        kind=InteractionKind.SINGLE_SELECT.value,
+        prompt=question or "Select an option",
+        options=options,
+        allows_text=False,
+        option_bytes=option_bytes,
     )

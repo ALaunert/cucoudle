@@ -804,3 +804,19 @@
 **Решения, ограничения и проблемы:** Readable mode намеренно может менять большие пробельные отступы для рефлоу; поэтому `1:1` всегда доступен как lossless-представление. Оба режима сохраняют text selection и ANSI цвет/bold/italic/underline. Физический iOS/Android smoke и тюнинг ширины/типографики ещё нужны.
 
 **Следующий шаг:** Прогнать на iPhone живые Claude/Codex сессии, сравнить `Читать` и `1:1` на code blocks, tables, approval prompts и spinner redraw, затем докрутить spacing/palette по device-снимкам.
+## 2026-07-11 — Alt-screen adapter: структурные кнопки для реальных промптов Claude Code
+
+**Цель:** Кнопки Approve/Reject/выбор не появлялись для настоящих промптов Claude Code — детекция шла по сырому хвосту вывода, а alt-screen TUI рисует меню абсолютным позиционированием курсора, из-за чего строки склеиваются в одну и детектор ничего не находил.
+
+**Что фактически сделано:**
+- Детекция промптов теперь идёт по **отрендеренному pyte-экрану** (`TerminalRenderer.screen_rows()`), когда у сессии есть renderer; сырой line-oriented детектор (yes/no, текстовый вопрос) остался fallback'ом.
+- `detect_screen_prompt` в `interactions.py`: распознаёт numbered-select меню по якорю-футеру («Enter to select · ↑/↓ to navigate · Esc to cancel»), собирает все numbered-строки над футером (строки-описания между опциями игнорируются), определяет выбранную опцию по маркеру `❯`, эмитит `singleSelect`.
+- Ответ маппится в навигацию: стрелки (`\x1b[A`/`\x1b[B`) от текущей выбранной опции к целевой + Enter — совпадает с инструкцией самого футера; пишется в PTY напрямую (без paste-обёртки).
+
+**Затронуто:** `apps/desktop/cucoudle_desktop/{render.py,interactions.py,daemon.py}` и `apps/desktop/tests/test_interactions.py`.
+
+**Проверки:** desktop pytest 80 passed. Проверено на **настоящем Claude Code** через полный стек (свежий relay с негоциацией + реальный демон + mobile WS-клиент): его alt-screen trust-промпт распознан как `singleSelect` («Yes, I trust this folder / No, exit»), ответ (Enter по подсвеченной опции) → `interaction.resolved` (answered) → Claude **продвинулся дальше** (новый terminal.output), что подтверждает и детекцию, и корректность маппинга стрелки+Enter. Capability negotiation (`interaction.structured`) прошла в pair и subscribe.
+
+**Решения/ограничения:** детектор рассчитан на numbered-select alt-screen меню; извлечение текста вопроса best-effort (для trust-промпта показал «Select an option», т.к. строка вопроса не оканчивалась на `?`/`:`); multiSelect и произвольные не-меню TUI-состояния остаются в raw-terminal fallback. Через Expo web не проверял: в `app.json` web-платформа отключена (`platforms: ["ios","android"]`) — вместо этого прогнан headless-E2E против реального Claude.
+
+**Следующий шаг:** Улучшить извлечение текста вопроса из alt-screen меню; проверить в самом Expo-приложении на устройстве.

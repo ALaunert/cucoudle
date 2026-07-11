@@ -1,8 +1,35 @@
-from cucoudle_desktop.interactions import detect_prompt
+from cucoudle_desktop.interactions import detect_prompt, detect_screen_prompt
 
 
 def _opt_bytes(detected, oid):
     return detected.option_bytes[oid]
+
+
+def test_screen_menu_maps_options_to_arrow_navigation():
+    rows = [
+        "Какую систему контроля версий использовать?",
+        "❯ 1. git",
+        "     Работать через git.",
+        "  2. hg (Mercurial)",
+        "  3. Type something.",
+        "",
+        "Enter to select · ↑/↓ to navigate · Esc to cancel",
+    ]
+    d = detect_screen_prompt(rows)
+    assert d is not None
+    assert d.kind == "singleSelect"
+    assert d.prompt == "Какую систему контроля версий использовать?"
+    assert [o.id for o in d.options] == ["option_1", "option_2", "option_3"]
+    # selection sits on option 1, so navigate down N steps then Enter
+    assert d.option_bytes["option_1"] == b"\r"
+    assert d.option_bytes["option_2"] == b"\x1b[B\r"
+    assert d.option_bytes["option_3"] == b"\x1b[B\x1b[B\r"
+
+
+def test_screen_menu_requires_navigation_footer():
+    # A plain numbered list without the select-footer must not be a menu.
+    rows = ["Steps:", "1. build the thing", "2. ship the thing", "done"]
+    assert detect_screen_prompt(rows) is None
 
 
 def test_yes_no_default_no():
