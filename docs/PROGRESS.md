@@ -595,3 +595,17 @@
 **Решения, ограничения и проблемы:** Причина воспроизведена по времени: Homebrew restart daemon в `14:23:54` оборвал активный shim. PTY-сессии пока in-memory и не переживают daemon restart; это отдельное архитектурное ограничение.
 
 **Следующий шаг:** Выпустить Homebrew `v0.1.3`, обновить shims через `cucoudle install` и повторить daemon-restart smoke с активным TUI.
+
+## 2026-07-11 — Серверный рендер терминала: цветной вывод сессии на мобиле
+
+**Цель:** Заменить нечитаемый плоский текст сессии на мобиле картинкой, близкой к десктопному терминалу с Claude Code/Codex, исправив проблему на стороне десктопа.
+
+**Сделано:** Десктоп-демон эмулирует терминал через `pyte` (`TerminalRenderer`: history-зона append-only строк + live screen, стилизованные runs c fg/bg/bold/italic/underline). Кадры `terminal.render` эмитятся с коалесингом 50 мс — перерисовки TUI-спиннеров схлопываются в актуальное состояние. Протокол дополнен additively: событие `terminal.render` в `DESKTOP_EVENTS` (relay форвардит автоматически) и снапшот `terminalRender` в результате `session.subscribe`. Мобилка хранит `renderBySessionId` (append history / replace screen / дедуп по seq / гидрация из снапшота) и рендерит `StyledTerminal` — FlatList цветных monospace-строк с ANSI-палитрой под тёмную тему; при отсутствии render-данных остаётся fallback `PlainTerminal`. Сырой `terminal.output` сохранён для совместимости.
+
+**Затронуто:** `packages/protocol/src/{terminalRender.ts,events.ts,methods.ts,index.ts}`, `apps/desktop/{pyproject.toml,cucoudle_desktop/{render.py,registry.py,daemon.py}}`, `apps/mobile/src/state/{renderBuffer.ts,sessionState.ts,sessionReducer.ts}`, `apps/mobile/src/features/session/{ansiPalette.ts,StyledTerminal.tsx,SessionScreen.tsx}` + тесты во всех трёх пакетах.
+
+**Проверки:** core vitest 58 passed (5 новых схемных), desktop pytest 64 passed (10 новых: SGR, схлопывание спиннера, cap history, коалесинг, снапшот в subscribe), mobile jest 156 passed (новые renderBuffer/reducer/StyledTerminal), оба typecheck чисто. Сквозная проверка: имитация TUI (баннер + 20 перерисовок спиннера + результат) через реальный `TerminalRenderer` даёт чистый кадр без мусора, валидный по zod-схеме протокола.
+
+**Решения и ограничения:** эмуляция на десктопе выбрана вместо xterm.js-в-WebView, чтобы мобилка осталась нативной, а проблема решалась в источнике; трафик временно дублируется (raw + render); pyte покрывает не 100% xterm-фич (для Claude Code/Codex достаточно); палитра — приближение к десктопным темам. Живой прогон с настоящим Claude на телефоне отдельной проверкой не зафиксирован.
+
+**Следующий шаг:** Прогнать демо телефон ↔ relay ↔ desktop с настоящим CLI-агентом и при необходимости докрутить палитру/типографику; затем убрать дублирование raw-потока через capability negotiation.
