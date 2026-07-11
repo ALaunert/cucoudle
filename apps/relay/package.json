@@ -1,0 +1,21 @@
+{
+  "name": "@cucoudle/relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "fake:desktop": "tsx scripts/fake-desktop.ts",
+    "fake:mobile": "tsx scripts/fake-mobile.ts"
+  },
+  "dependencies": {
+    "@cucoudle/protocol": "*",
+    "@fastify/websocket": "^11.0.0",
+    "fastify": "^5.0.0"
+  },
+  "devDependencies": {
+    "ws": "^8.18.0",
+    "@types/ws": "^8.5.12"
+  }
+}
