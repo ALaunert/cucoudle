@@ -27,7 +27,7 @@ const REPO = path.resolve(import.meta.dirname, "../..");
 const RELAY_BASE = process.env.RELAY_WS ?? "ws://localhost:8787";
 const DESKTOP_VENV_PY = path.join(REPO, "apps/desktop/.venv/bin/python");
 const PY = process.env.CUCOUDLE_PY ?? (fs.existsSync(DESKTOP_VENV_PY) ? DESKTOP_VENV_PY : "python3");
-const CAT = process.env.CUCOUDLE_ECHO_BIN ?? "/usr/bin/cat";
+const CAT = process.env.CUCOUDLE_ECHO_BIN ?? "/bin/cat";
 
 const HOME = fs.mkdtempSync(path.join(os.tmpdir(), "cucoudle-it-"));
 const DESKTOP_ID = "desk_it_" + Date.now().toString(36);
@@ -84,6 +84,7 @@ function mobileReader(ws: WebSocket): Reader {
   const waiters: { p: (m: any) => boolean; resolve: (m: any) => void; timer: NodeJS.Timeout }[] = [];
   ws.on("message", (raw: Buffer) => {
     const m = JSON.parse(raw.toString());
+    if (process.env.IT_DEBUG) console.log("[mobile<-]", raw.toString().slice(0, 300));
     const i = waiters.findIndex((w) => w.p(m));
     if (i >= 0) { clearTimeout(waiters[i]!.timer); waiters.splice(i, 1)[0]!.resolve(m); }
     else queue.push(m);

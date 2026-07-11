@@ -621,3 +621,17 @@
 **Решения, ограничения и проблемы:** Локальный `brew upgrade` не запущен во время активной managed Codex-сессии, поскольку service restart оборвёт её in-memory PTY. Это не блокирует публичный release.
 
 **Следующий шаг:** После завершения активного Codex выполнить `brew upgrade cucoudle && cucoudle install`, затем повторить controlled daemon-restart smoke.
+
+## 2026-07-11 — Integration smoke на macOS и против production relay
+
+**Цель:** Прогнать полный кросс-язык integration smoke против production relay и починить его запуск на macOS.
+
+**Сделано:** Найдено и исправлено: харнесс подставлял echo-бинарь `/usr/bin/cat`, которого нет на macOS, поэтому `_resolve_real` молча запускал настоящий Claude CLI (trust-prompt вместо эха) и STAGE 7 падал по таймауту. Дефолт заменён на `/bin/cat` (есть на macOS и Linux), добавлен отладочный вывод всех входящих mobile-сообщений под флагом `IT_DEBUG=1`.
+
+**Затронутые компоненты:** `tests/integration/desktop-relay-smoke.ts`.
+
+**Проверки:** `RELAY_WS=wss://relay.launert.dev npm run test:integration` — ALL STAGES PASSED против production relay (register/pairing/list/spawn/subscribe/input→echo). Также зелёные: `npm test` (core + 145 mobile), оба typecheck, `expo-doctor` 18/18, relay `healthz` 200.
+
+**Решения, ограничения и проблемы:** Во время одного из прогонов production relay кратко отвечал HTTP 502 (совпало с параллельным деплоем) — харнесс это переживает переподключением демона, но flaky-прогоны при активном деплое возможны. Харнесс не поднимает relay сам: локальный запуск требует `npm run relay` или `RELAY_WS` на внешний relay.
+
+**Следующий шаг:** Сквозной demo-прогон с Expo-приложением на физическом iPhone против production relay и настоящего CLI-агента.
