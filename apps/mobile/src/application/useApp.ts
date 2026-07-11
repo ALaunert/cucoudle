@@ -1,6 +1,10 @@
 import { createContext, useContext } from "react";
 
-import type { MobileDevice } from "@cucoudle/protocol";
+import type {
+  InteractionResponse,
+  MobileDevice,
+  SessionInputParams,
+} from "@cucoudle/protocol";
 import type { PairingProfile, PairingResult, PairingTransportRequest } from "../pairing/pairingProfile";
 import type { PairingRepository } from "../pairing/pairingRepository";
 import type { MobileClient } from "../protocol/mobileClient";
@@ -26,6 +30,7 @@ export type AppContextValue = {
   profile: PairingProfile | null;
   sessionState: SessionState;
   hasLoadedSessionList: boolean;
+  negotiatedCapabilities?: ReadonlySet<string>;
   client: MobileClient;
   profileRepository: PairingRepository;
   navigation: AppNavigation;
@@ -37,6 +42,16 @@ export type AppContextValue = {
   dismissAttention(key: string): void;
   openSession(sessionId: string): void;
   viewSession(sessionId: string): void;
+  retryConnection(): Promise<void>;
+  pairAnotherComputer(): void;
+  clearPairing(): Promise<void>;
+  sendInput(params: SessionInputParams): Promise<{ accepted: boolean; bytesWritten?: number }>;
+  interruptSession(params: { sessionId: string }): Promise<unknown>;
+  respondInteraction(params: {
+    sessionId: string;
+    interactionId: string;
+    response: InteractionResponse;
+  }): Promise<unknown>;
 };
 
 export const AppContext = createContext<AppContextValue | null>(null);

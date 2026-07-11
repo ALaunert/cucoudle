@@ -1,15 +1,23 @@
-import type { Session } from "@cucoudle/protocol";
+import type { InteractionRequest, Session } from "@cucoudle/protocol";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { makeDismissalKey } from "../../state/inboxSelectors";
 import { AppButton } from "../../ui/components/AppButton";
 import { colors, radii, spacing, typography } from "../../ui/theme";
+import {
+  StructuredActionZone,
+  type StructuredInteractionResponse,
+} from "../session/StructuredActionZone";
 
 type AttentionCardProps = {
   session: Session;
   onOpen: (sessionId: string) => void;
   onView: (sessionId: string) => void;
   onDismiss: (attentionKey: string) => void;
+  negotiatedCapabilities?: ReadonlySet<string>;
+  interaction?: InteractionRequest;
+  onRespond?: (params: StructuredInteractionResponse) => Promise<unknown>;
+  canMutate?: boolean;
 };
 
 const cardContent = {
@@ -35,6 +43,10 @@ export function AttentionCard({
   onOpen,
   onView,
   onDismiss,
+  negotiatedCapabilities,
+  interaction,
+  onRespond = async () => undefined,
+  canMutate = false,
 }: AttentionCardProps) {
   if (
     session.status !== "waiting" &&
@@ -77,7 +89,18 @@ export function AttentionCard({
           <Text style={styles.dismissText}>Скрыть</Text>
         </Pressable>
       </View>
-      <AppButton label={content.action} onPress={handlePrimaryAction} />
+      {session.status === "waiting" ? (
+        <StructuredActionZone
+          canMutate={canMutate}
+          interaction={interaction}
+          negotiatedCapabilities={negotiatedCapabilities}
+          onOpenSession={onOpen}
+          onRespond={onRespond}
+          sessionId={session.id}
+        />
+      ) : (
+        <AppButton label={content.action} onPress={handlePrimaryAction} />
+      )}
     </View>
   );
 }

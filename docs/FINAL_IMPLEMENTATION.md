@@ -30,7 +30,9 @@ Cucoudle — мобильное приложение для удалённого
 - реализован независимый dark UI kit для mobile: theme tokens, safe-area screen, accessible primary/secondary/destructive buttons с 44pt touch target, connection banners, textual status badges и empty states;
 - реализован mobile pairing flow: runtime-валидация QR/manual payload, точный полный relay WebSocket URL, CameraView и manual fallback, SecureStore-backed active profile, стабильная device identity и понятные pairing error states;
 - реализованы продуктовые экраны Action Inbox и Sessions: status-derived attention cards, exact-key dismissal, generic lifecycle activity, offline/reconnecting states, active/completed filters, cwd basename и доступная навигация к session detail;
-- реализован application bootstrap/provider: восстановление активного profile, переход в pairing либо reconnecting tab shell, общие state/client/repository/navigation callbacks и filesystem-backed четыре tab routes; New/Settings/Session detail пока являются безопасными placeholders до Wave 3;
+- реализован application bootstrap/provider и reconnect coordinator: восстановление profile, `mobile.resume` → `session.list` → восстановление открытой `session.subscribe`, bounded reconnect, отдельные recovery/pairing-required состояния и запрет mutating actions вне online; повторное pairing использует изолированный transport;
+- реализованы live Session detail, New и Settings: моноширинный terminal buffer, ввод текста, interrupt, connection/recovery controls, подключение другого компьютера и очистка pairing profile;
+- structured approval controls включаются только при negotiated capability `interaction.structured`, требуют online-состояния и защищены от повторной отправки; без capability остаётся raw terminal/session fallback;
 - зафиксирован CLI-first MVP: desktop-daemon с shell-shims запускает CLI-агентов в PTY, relay передаёт сырой терминальный вывод на мобилу (без Claude/Codex SDK на этом этапе);
 - реализован канал десктоп↔мобила — shared-протокол и relay-брокер (срез разработчика 3):
   - монорепо на npm workspaces с пакетами `@cucoudle/protocol` и `@cucoudle/relay`;
@@ -75,7 +77,7 @@ Cucoudle — мобильное приложение для удалённого
 
 ### Ещё не реализовано
 
-Expo workspace, mobile test harness, protocol/state/UI foundations, pairing, Action Inbox, Sessions и bootstrap provider уже созданы. Live Session detail, production runtime event wiring, reconnect coordinator, полноценные New/Settings screens и запуск на iPhone ещё не реализованы; соответствующие filesystem routes сейчас используют безопасные placeholders. Канал по-прежнему функционально проверен через технический WebSocket mobile-клиент, а Expo client пока проверен deterministic fake sockets. Расширенные `session.input` modes (`bytes`, `keys`) и structured interactions реализованы на уровне протокола: shared Zod-схемы в `@cucoudle/protocol` и relay-allowlist готовы и покрыты тестами (relay форвардит `interaction.respond` и фанит `interaction.*`). Capability negotiation (offers/`negotiatedCapabilities`) пока только специфицирована и не реализована. Ещё не сделаны: Pydantic-зеркало и key/bytes mapping + provider-детекторы на desktop, mobile offer/controls, capability negotiation в relay/desktop/mobile, tray/settings UI, SQLite persistence и production security. Production relay доступен по `https://relay.launert.dev`/`wss://relay.launert.dev`; оба WSS route проверены реальным upgrade и protocol error response. После добавления Expo SDK 54 актуальный `npm audit` сообщает 14 moderate advisories в Expo dependency chain; предлагаемое npm исправление переводит проект на несовместимый с выбранным Expo Go стеком Expo 57, поэтому zero-vulnerability gate остаётся открытым.
+Expo workspace, protocol/state/UI foundations, pairing, Action Inbox, Sessions, live Session detail, New/Settings и reconnect/recovery composition уже созданы. Остались production runtime composition/smoke из Task 14 и запуск на физическом iPhone; Expo client пока проверен component/application tests с deterministic fake sockets, а полный канал — техническим WebSocket mobile-клиентом. Расширенные `session.input` modes (`bytes`, `keys`) и structured interactions реализованы в shared Zod-схемах и relay routing; mobile уже умеет capability-gated approval response, но production offers/intersection и desktop provider bindings ещё не завершены. Ещё не сделаны: Pydantic-зеркало и key/bytes mapping + provider-детекторы на desktop, полноценная сквозная capability negotiation, tray UI, SQLite persistence и production security. Production relay доступен по `https://relay.launert.dev`/`wss://relay.launert.dev`; оба WSS route проверены реальным upgrade и protocol error response. После добавления Expo SDK 54 актуальный `npm audit` сообщает 14 moderate advisories в Expo dependency chain; предлагаемое npm исправление переводит проект на несовместимый с выбранным Expo Go стеком Expo 57, поэтому zero-vulnerability gate остаётся открытым.
 
 ## Процесс разработки
 
@@ -97,18 +99,18 @@ One chat.»). Дек рассчитан на аудиторию жюри и ис
 `docs/superpowers/specs/2026-07-11-hackathon-pitch-deck-design.md`. Важно: дек
 презентует и целевые возможности (например, подтверждение/отклонение запросов и
 уведомления), которые в продукте ещё не реализованы, — фактическое проверенное
-состояние остаётся в разделах выше. Демо-слайд — заглушка под запись/показ к
-демо-дню, поскольку мобильное приложение ещё не создано.
+состояние остаётся в разделах выше. Демо-слайд пока остаётся заглушкой до
+записи проверенного Expo runtime-сценария на устройстве.
 - для Expo `Action Inbox` подготовлен подробный TDD-план из 14 задач: после последовательного scaffold предусмотрены три параллельные волны с непересекающимся владением файлами и последовательным integration checkpoint после каждой;
 - параллельные mobile-исполнители не меняют Git index, а оркестратор проверяет общий результат, обновляет документы, коммитит и отправляет завершённую волну напрямую в `main`.
 
 ## Текущее проверенное состояние
 
-Репозиторий содержит описание продукта, проектные спецификации, рабочий production relay, desktop-daemon с PTY-мостом и shell-shims, а также Expo SDK 54 workspace с проверенными Wave 2 screens/application composition. Независимо разработанные desktop и relay соединены и проверены **воспроизводимым кросс-язык harness** (`npm run test:integration`, `tests/integration/desktop-relay-smoke.ts`): настоящий Python-демон против запущенного TS relay + mobile WebSocket-клиент проходят `register`/`pairing`/`session.list`/спаун сессии/`subscribe`/`session.input`→`terminal.output`. Это подтверждает совпадение контракта Zod↔Pydantic на живых сокетах. Текущий gate проходит 53 core tests, 77 mobile tests и оба typecheck; live terminal/reconnect runtime и реальный запуск на iPhone пока не подтверждены, а настоящий Claude/Codex/Cursor в интеграционном прогоне заменялся контролируемым `/bin/cat` за shim `claude`.
+Репозиторий содержит описание продукта, проектные спецификации, рабочий production relay, desktop-daemon с PTY-мостом и shell-shims, а также Expo SDK 54 workspace с проверенной Wave 3 application composition: live terminal/session controls, structured approval gating и reconnect/recovery lifecycle. Независимо разработанные desktop и relay соединены и проверены **воспроизводимым кросс-язык harness** (`npm run test:integration`, `tests/integration/desktop-relay-smoke.ts`): настоящий Python-демон против запущенного TS relay + mobile WebSocket-клиент проходят `register`/`pairing`/`session.list`/спаун сессии/`subscribe`/`session.input`→`terminal.output`. Текущий Wave 3 gate проходит 53 core tests, 143 mobile tests и оба typecheck. Сквозной runtime smoke именно через Expo-приложение и реальный запуск на iPhone пока не подтверждены, а настоящий Claude/Codex/Cursor в интеграционном прогоне заменялся контролируемым `/bin/cat` за shim `claude`.
 
 ## Ограничения
 
-- pairing, Inbox и Sessions UI готовы и покрыты component tests, но live Session detail, reconnect/runtime composition и физический iPhone smoke ещё не завершены; реальный desktop-daemon и relay пока проверены с техническим mobile-клиентом и управляемой PTY-сессией, но не с Expo-приложением и настоящим Claude/Codex/Cursor процессом;
+- pairing, Inbox, Sessions, live Session detail, reconnect и recovery UI готовы и покрыты component/application tests, но финальный production runtime smoke и физический iPhone smoke ещё не завершены; реальный desktop-daemon и relay пока проверены с техническим mobile-клиентом и управляемой PTY-сессией, но не с Expo-приложением и настоящим Claude/Codex/Cursor процессом;
 - desktop-daemon пока без tray/GUI и без персистентности сессий в SQLite между рестартами;
 - daemon autostart/login item пока не устанавливается автоматически: текущий CLI setup все еще просит один раз запустить `cucoudle daemon`;
 - relay state остаётся in-memory: Compose переживает crash/reboot, но restart процесса сбрасывает pairing и mobile resume tokens;
@@ -117,7 +119,7 @@ One chat.»). Дек рассчитан на аудиторию жюри и ис
 - запуск через Expo Go описан проектно и не подтверждён фактическим запуском на устройстве.
 - актуальный `npm audit` после Expo scaffold сообщает 14 moderate advisories в транзитивной цепочке Expo SDK 54; обновление до предлагаемого Expo 57 противоречит утверждённой совместимости с Expo Go SDK 54, поэтому это открытый блокер будущего zero-vulnerability gate;
 - `waiting` опционален: без desktop-side определения ожидания мобильный UI не пытается угадывать его по сырому терминальному тексту;
-- прямые действия `Разрешить` / `Отклонить` уже описаны target-контрактом и реализованы в TS/Zod + relay routing, но ещё требуют desktop bindings, capability negotiation и mobile controls; запуск сессии с телефона и семантическая лента действий всё ещё требуют будущих расширений;
+- mobile controls `Разрешить` / `Отклонить` и relay routing реализованы, но появляются только при полученной capability `interaction.structured`; desktop bindings и полная сквозная capability negotiation ещё нужны для production-сценария, а запуск сессии с телефона и расширенная семантическая лента действий остаются будущими расширениями;
 - красивый ANSI-рендеринг, code blocks, ссылки и полноценная эмуляция TUI не входят в мобильный MVP.
 
 ## Демонстрационный сценарий
@@ -128,7 +130,7 @@ One chat.»). Дек рассчитан на аудиторию жюри и ис
 
 1. TypeScript/Zod schemas для input modes и structured interactions и relay allowlist — сделано; осталось: capability offers/intersection (TS + relay) и Pydantic-зеркало на desktop.
 2. Добавить desktop key/bytes mapping и первый provider interaction adapter с stale-response protection.
-3. Продолжить `docs/superpowers/plans/2026-07-11-mobile-action-inbox-implementation.md`: после завершённой Wave 2 выполнить TDD-волны Session detail, New/Settings, reconnect coordinator и structured action integration.
+3. Завершить Task 14 mobile-плана: собрать production runtime composition, выполнить mobile flow/integration smoke, Expo doctor и запуск на физическом iPhone.
 4. После реализации capability negotiation включить в том же UI terminal keyboard, Approve/Reject, choices и text response с обязательным raw fallback; повторить полный E2E.
 5. Проверить настоящие Claude/Codex/Cursor prompts на macOS/Linux и iOS/Android.
 6. Добавить автоматическое desktop device enrollment и хранение credential в Keychain/Secret Service без пользовательской настройки.

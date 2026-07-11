@@ -1,23 +1,21 @@
-import { Text } from "react-native";
+import { PROTOCOL_VERSION } from "@cucoudle/protocol";
+import Constants from "expo-constants";
 
 import { useApp } from "../../application/useApp";
-import { AppScreen } from "../../ui/components/AppScreen";
-import { EmptyState } from "../../ui/components/EmptyState";
-import { colors, typography } from "../../ui/theme";
+import { SettingsScreen } from "../../features/settings/SettingsScreen";
 
 export default function SettingsRoute() {
   const app = useApp();
+
   return (
-    <AppScreen>
-      <EmptyState
-        description={`Состояние подключения: ${app.connectionStatus}`}
-        illustration={
-          <Text style={{ color: colors.text, fontSize: typography.body }}>
-            {app.profile?.desktopName ?? "Компьютер не подключён"}
-          </Text>
-        }
-        title="Настройки"
-      />
-    </AppScreen>
+    <SettingsScreen
+      appVersion={Constants.expoConfig?.version ?? "1.0.0"}
+      connectionStatus={app.connectionStatus}
+      onRePair={() => void app.clearPairing()}
+      onReplaceComputer={() => void app.clearPairing()}
+      onRetry={() => void app.retryConnection()}
+      profile={app.profile}
+      protocolVersion={PROTOCOL_VERSION}
+    />
   );
 }

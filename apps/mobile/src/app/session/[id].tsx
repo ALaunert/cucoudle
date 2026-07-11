@@ -1,26 +1,44 @@
 import { useLocalSearchParams } from "expo-router";
 
 import { useApp } from "../../application/useApp";
-import { AppButton } from "../../ui/components/AppButton";
-import { AppScreen } from "../../ui/components/AppScreen";
-import { EmptyState } from "../../ui/components/EmptyState";
+import {
+  SessionScreen,
+  type SessionConnectionStatus,
+} from "../../features/session/SessionScreen";
+
+export function normalizeSessionRouteId(
+  value: string | readonly string[] | undefined,
+): string {
+  const values = Array.isArray(value) ? value : [value];
+  return values.find((candidate) => candidate?.trim())?.trim() ?? "";
+}
 
 export default function SessionRoute() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const app = useApp();
+  const sessionId = normalizeSessionRouteId(id);
+  const connectionStatus: SessionConnectionStatus =
+    app.connectionStatus === "online"
+      ? "online"
+      : app.connectionStatus === "offline"
+        ? "offline"
+        : app.connectionStatus === "resyncing"
+          ? "resyncing"
+          : app.connectionStatus === "recovery"
+            ? "recovery"
+            : "reconnecting";
+
   return (
-    <AppScreen>
-      <EmptyState
-        action={
-          <AppButton
-            label="К списку сессий"
-            onPress={() => app.navigation.replace("/(tabs)/sessions")}
-            variant="secondary"
-          />
-        }
-        description="Live terminal и controls будут подключены в следующей волне."
-        title={`Сессия ${id ?? ""}`.trim()}
-      />
-    </AppScreen>
+    <SessionScreen
+      connectionStatus={connectionStatus}
+      negotiatedCapabilities={app.negotiatedCapabilities}
+      onInterrupt={app.interruptSession}
+      onOpenSession={app.openSession}
+      onRespondInteraction={app.respondInteraction}
+      onSendInput={app.sendInput}
+      sessionId={sessionId}
+      state={app.sessionState}
+      structuredInteraction={app.sessionState.activeInteractionsBySessionId[sessionId]}
+    />
   );
 }

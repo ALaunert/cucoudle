@@ -1,4 +1,4 @@
-import type { Session } from "@cucoudle/protocol";
+import type { InteractionRequest, Session } from "@cucoudle/protocol";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { selectAttentionCards, selectRecentActivity } from "../../state/inboxSelectors";
@@ -12,6 +12,7 @@ import { EmptyState } from "../../ui/components/EmptyState";
 import { colors, spacing, typography } from "../../ui/theme";
 import { ActivityRow } from "./ActivityRow";
 import { AttentionCard } from "./AttentionCard";
+import type { StructuredInteractionResponse } from "../session/StructuredActionZone";
 
 export type InboxConnectionStatus = "connected" | ConnectionStatus;
 
@@ -23,6 +24,10 @@ type InboxScreenProps = {
   onOpenSession: (sessionId: string) => void;
   onViewSession: (sessionId: string) => void;
   onDismissAttention: (attentionKey: string) => void;
+  negotiatedCapabilities?: ReadonlySet<string>;
+  activeInteractions?: Record<string, InteractionRequest>;
+  onRespondInteraction?: (params: StructuredInteractionResponse) => Promise<unknown>;
+  canMutate?: boolean;
 };
 
 function attentionCountLabel(count: number): string {
@@ -38,6 +43,10 @@ export function InboxScreen({
   onOpenSession,
   onViewSession,
   onDismissAttention,
+  negotiatedCapabilities,
+  activeInteractions,
+  onRespondInteraction,
+  canMutate = false,
 }: InboxScreenProps) {
   const attention = attentionCards ?? (state ? selectAttentionCards(state) : []);
   const activity = recentActivity ?? (state ? selectRecentActivity(state) : []);
@@ -82,9 +91,13 @@ export function InboxScreen({
             </Text>
             {attention.map((item) => (
               <AttentionCard
+                canMutate={canMutate}
                 key={`${item.id}:${item.status}:${item.lastActivityAt}:${item.exitCode ?? ""}`}
                 onDismiss={onDismissAttention}
+                interaction={activeInteractions?.[item.id]}
+                negotiatedCapabilities={negotiatedCapabilities}
                 onOpen={onOpenSession}
+                onRespond={onRespondInteraction}
                 onView={onViewSession}
                 session={item}
               />

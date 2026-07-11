@@ -16,9 +16,13 @@ export default function InboxRoute() {
 
   return (
     <InboxScreen
+      canMutate={app.connectionStatus === "online"}
       connectionStatus={connectionStatus}
+      activeInteractions={app.sessionState.activeInteractionsBySessionId}
+      negotiatedCapabilities={app.negotiatedCapabilities}
       onDismissAttention={app.dismissAttention}
       onOpenSession={app.openSession}
+      onRespondInteraction={app.respondInteraction}
       onViewSession={app.viewSession}
       state={app.sessionState}
     />

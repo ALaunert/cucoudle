@@ -431,3 +431,17 @@
 **Решения, ограничения и проблемы:** Pairing transport и все mutating callbacks выполняются один раз без automatic retry. Bootstrap с сохранённым profile намеренно входит в `reconnecting`; фактический resume/list/subscribe lifecycle принадлежит Wave 3. Four-tab placeholders нужны для реальной Expo Router composition и будут заменены TDD-экранами, а не считаются готовыми New/Settings/Session detail. Zero-vulnerability audit gate остаётся открытым из-за несовместимости предлагаемого fix с утверждённым SDK 54.
 
 **Следующий шаг:** Параллельно реализовать Wave 3 lanes: live Session detail, New/Settings и reconnect coordinator, затем capability-gated structured action zone и общий integration checkpoint.
+
+## 2026-07-11 — Live Session, reconnect/recovery и structured actions (Wave 3)
+
+**Цель:** Завершить основные mobile-сценарии после pairing: управлять живой сессией, безопасно восстанавливаться после разрыва и отвечать на поддержанные structured interactions.
+
+**Сделано:** Реализованы Session detail с plain terminal, composer и interrupt, полноценные New/Settings routes, reconnect coordinator с `mobile.resume` → `session.list` → восстановлением подписки, bounded reconnect и отдельными recovery/pairing-required состояниями. `AppProvider` связал runtime callbacks для input/interrupt/interaction response, сохраняет открытый session route при обычном reconnect и использует отдельный pairing transport. Structured approval zone показывается только при `interaction.structured`, блокирует mutating actions offline и предотвращает двойной/неопределённый повтор ответа до свежей подписки. Code review дополнительно выявил и через red→green regressions закрыл transport leaks, потерю route при reconnect, гонку out-of-order subscribe и повторное открытие той же pending-сессии.
+
+**Затронутые компоненты:** `apps/mobile/src/application`, routes `apps/mobile/src/app`, `apps/mobile/src/features/{session,new,settings,pairing,inbox}` и соответствующие Jest tests; `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
+
+**Проверки:** Focused reviews Session/New+Settings/reconnect — PASS; финальное integration review — PASS после regressions. `git diff --check` — успешно. `npm test` — 53 core tests в 9 файлах и 143 mobile tests в 21 suites прошли. `npm run typecheck` — core и mobile прошли. `npm audit` завершился exit 1 и сообщил прежние 14 moderate advisories в транзитивных `postcss`/`uuid` Expo SDK 54; предлагаемое исправление требует breaking upgrade на Expo 57.
+
+**Решения, ограничения и проблемы:** Mutating requests отправляются только online и никогда не retry автоматически. Неопределённый результат `interaction.respond` остаётся заблокированным до свежего interaction object, чтобы не дублировать решение. Structured controls скрыты без negotiated capability, сохраняя raw terminal fallback. Полный Expo runtime/E2E и физический iPhone smoke относятся к Task 14; zero-vulnerability audit gate остаётся открытым из-за несовместимого автоматического upgrade.
+
+**Следующий шаг:** Выполнить Task 14: production runtime composition, сквозной mobile flow/integration smoke, Expo doctor и проверку на физическом iPhone.
