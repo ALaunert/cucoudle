@@ -16,6 +16,7 @@ export type RelayRuntimeOptions = {
   desktopResponseTimeoutMs?: number;
   auditLog?: RelayAuditLogger;
   logInputText?: boolean;
+  logPayloads?: boolean;
 };
 
 export function buildApp(
@@ -47,6 +48,7 @@ export function buildApp(
         relayMobileUrl,
         auditLog,
         options.logInputText === true,
+        options.logPayloads === true,
       ));
       socket.on("close", () => onDesktopClose(state, socket, auditLog));
     });

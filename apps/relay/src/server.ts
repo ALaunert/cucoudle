@@ -6,8 +6,14 @@ const relayMobileUrl = process.env.RELAY_MOBILE_URL;
 const mobileSessionTtlMs = Number(process.env.MOBILE_SESSION_TTL_SECONDS ?? 8 * 60 * 60) * 1000;
 const desktopResponseTimeoutMs = Number(process.env.DESKTOP_RESPONSE_TIMEOUT_MS ?? 15_000);
 const logInputText = process.env.RELAY_LOG_INPUT_TEXT === "true";
+const logPayloads = process.env.RELAY_LOG_PAYLOADS === "true";
 
-startServer(port, relayMobileUrl, { mobileSessionTtlMs, desktopResponseTimeoutMs, logInputText }, host)
+startServer(port, relayMobileUrl, {
+  mobileSessionTtlMs,
+  desktopResponseTimeoutMs,
+  logInputText,
+  logPayloads,
+}, host)
   .then((app) => {
     app.log.info(`relay listening on ${host}:${port}`);
     console.log(`cucoudle relay listening on ws://${host}:${port}`);

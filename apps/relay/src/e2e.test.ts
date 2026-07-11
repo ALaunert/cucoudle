@@ -58,6 +58,7 @@ describe("minimum demo contract end to end", () => {
     app = buildApp("ws://127.0.0.1/v1/ws/mobile", {
       auditLog: (event, fields = {}) => auditEntries.push({ event, fields }),
       logInputText: true,
+      logPayloads: true,
     });
     await app.listen({ port: 0, host: "127.0.0.1" });
     const addr = app.server.address();
@@ -115,6 +116,27 @@ describe("minimum demo contract end to end", () => {
         requestId: "m4",
         sessionId: "sess_1",
         inputText: "continue\n",
+      }),
+    });
+    expect(auditEntries).toContainEqual({
+      event: "message.received",
+      fields: expect.objectContaining({
+        role: "desktop",
+        kind: "event",
+        eventName: "terminal.output",
+        payload: expect.objectContaining({
+          data: expect.objectContaining({ data: "Running tests...\r\n" }),
+        }),
+      }),
+    });
+    expect(auditEntries).toContainEqual({
+      event: "message.received",
+      fields: expect.objectContaining({
+        role: "mobile",
+        method: "session.input",
+        payload: expect.objectContaining({
+          params: expect.objectContaining({ data: "continue\n" }),
+        }),
       }),
     });
     expect(auditEntries).toContainEqual({

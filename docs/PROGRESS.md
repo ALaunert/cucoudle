@@ -529,3 +529,17 @@
 **Решения, ограничения и проблемы:** Пакет по-прежнему потребляется как TS-исходники без build-шага; extensionless — совместимый общий знаменатель для Metro, esbuild/tsx и `moduleResolution: Bundler`.
 
 **Следующий шаг:** Пользователю пересобрать `npx expo start --tunnel`; при новых resolve-ошибках прислать stack.
+
+## 2026-07-11 — Полные protocol payload logs для тестирования
+
+**Цель:** Видеть в relay logs все desktop/mobile requests, responses, events и текстовые данные при сквозной отладке.
+
+**Сделано:** Добавлен test flag `RELAY_LOG_PAYLOADS=true`. Каждый валидный inbound envelope создаёт `message.received` с role, kind, method/event, request ID, byte count и полным `payload`. Рекурсивный redactor заменяет значения ключей `token`, `pairingCode`, `secret`, `password`, `authorization` на `<redacted>`. Текущий test Compose включает режим вместе с input/output text logging.
+
+**Затронутые компоненты:** Relay audit/app/server/handlers, Compose, E2E test и документация; desktop/mobile runtime не менялся.
+
+**Проверки:** E2E требует полный payload для mobile `session.input` и desktop `terminal.output`, а также подтверждает отсутствие реального pairing code во всех audit entries.
+
+**Решения, ограничения и проблемы:** Credential-поля маскируются, но произвольный terminal text может сам содержать секреты; режим предназначен только для временного тестового окружения и должен выключаться перед обычной эксплуатацией.
+
+**Следующий шаг:** Развернуть relay и использовать `message.received.payload` для проверки полного Linux/macOS/mobile потока.

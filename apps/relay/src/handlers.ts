@@ -1,4 +1,5 @@
 import type { WebSocket } from "@fastify/websocket";
+import type { WireMessage } from "@cucoudle/protocol";
 import {
   parseWireMessage,
   makeResponse,
@@ -15,7 +16,7 @@ import {
   MOBILE_FORWARDED_METHODS,
 } from "@cucoudle/protocol";
 import { RelayState, type MobileConn } from "./state.js";
-import { NOOP_AUDIT_LOGGER, type RelayAuditLogger } from "./audit.js";
+import { NOOP_AUDIT_LOGGER, redactPayload, type RelayAuditLogger } from "./audit.js";
 
 export const DEFAULT_MOBILE_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 export const DEFAULT_DESKTOP_RESPONSE_TIMEOUT_MS = 15_000;
@@ -34,6 +35,7 @@ export function handleDesktopMessage(
   relayMobileUrl: string,
   auditLog: RelayAuditLogger = NOOP_AUDIT_LOGGER,
   logTerminalText = false,
+  logPayloads = false,
 ): void {
   const parsed = parseWireMessage(raw);
   if (!parsed.ok) {
@@ -47,6 +49,7 @@ export function handleDesktopMessage(
     return;
   }
   const msg = parsed.msg;
+  logReceivedMessage(auditLog, "desktop", msg, raw, logPayloads);
 
   if (isRequest(msg)) {
     if (msg.method === "desktop.register") {
@@ -117,6 +120,7 @@ export function handleMobileMessage(
     desktopResponseTimeoutMs?: number;
     auditLog?: RelayAuditLogger;
     logInputText?: boolean;
+    logPayloads?: boolean;
   } = {},
 ): void {
   const auditLog = options.auditLog ?? NOOP_AUDIT_LOGGER;
@@ -132,6 +136,7 @@ export function handleMobileMessage(
     return;
   }
   const msg = parsed.msg;
+  logReceivedMessage(auditLog, "mobile", msg, raw, options.logPayloads === true);
   if (!isRequest(msg)) return; // mobile only sends requests in MVP
 
   if (msg.method === "mobile.pair") {
@@ -309,4 +314,22 @@ function inputTextFrom(method: string, params: unknown, enabled: boolean): strin
 function terminalOutputTextFrom(event: string, data: unknown, enabled: boolean): string | undefined {
   if (!enabled || event !== "terminal.output" || typeof data !== "object" || data === null) return undefined;
   return "data" in data && typeof data.data === "string" ? data.data : undefined;
+}
+
+function logReceivedMessage(
+  auditLog: RelayAuditLogger,
+  role: "desktop" | "mobile",
+  message: WireMessage,
+  raw: string,
+  logPayloads: boolean,
+): void {
+  auditLog("message.received", {
+    role,
+    kind: message.kind,
+    requestId: "id" in message ? message.id : undefined,
+    method: isRequest(message) ? message.method : undefined,
+    eventName: isEvent(message) ? message.event : undefined,
+    messageBytes: Buffer.byteLength(raw),
+    payload: logPayloads ? redactPayload(message) : undefined,
+  });
 }

@@ -82,6 +82,12 @@ IDs, byte counts and result). Pairing codes and tokens are never logged.
 is enabled in the current test deployment and must be disabled for normal
 production where terminal text is sensitive.
 
+`RELAY_LOG_PAYLOADS=true` records every valid inbound protocol envelope under
+`message.received.payload`, including request params, response results and
+event data. Credential-like keys (`token`, `pairingCode`, `secret`, `password`,
+`authorization`) are recursively replaced with `<redacted>`. Arbitrary terminal
+text may still contain secrets, so this mode is test-only.
+
 ```bash
 docker logs --since 10m cucoudle-relay-relay-1
 docker logs -f cucoudle-relay-relay-1 | grep --line-buffered 'mobile.request.forwarded'
