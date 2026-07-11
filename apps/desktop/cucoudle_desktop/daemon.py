@@ -386,17 +386,21 @@ class Daemon:
             if params.get("inputMode") == "text":
                 # Deliver composer text the way a real terminal does: as an
                 # explicit paste (when the TUI enabled bracketed paste, e.g.
-                # codex/claude) plus a SEPARATE Enter keypress. A single
-                # "text\r" burst is treated as a paste and never submits.
+                # codex/claude) plus a SEPARATE, slightly-later Enter keypress.
+                # A single "text\r" burst is read as one chunk and treated as a
+                # paste, so the Enter never submits; the gap makes the app see a
+                # discrete Return like a human pressing it.
                 submit = bool(params.get("submit")) or data.endswith(("\n", "\r"))
                 body = data.rstrip("\r\n") if submit else data
-                if body and getattr(self, "_bracketed_paste", {}).get(sid):
+                bp = bool(getattr(self, "_bracketed_paste", {}).get(sid))
+                if body and bp:
                     body = "\x1b[200~" + body + "\x1b[201~"
+                self.log(f"session.input sid={sid} bracketed={bp} submit={submit} bodybytes={len(body)}")
                 try:
                     if body:
                         entry.pty.write(body.encode("utf-8"))
                     if submit:
-                        entry.pty.write(b"\r")
+                        self._submit_enter(entry.pty)
                 except (OSError, AttributeError) as exc:
                     raise ProtocolException(ErrorCode.PTY_WRITE_FAILED, str(exc))
                 return {"accepted": True}
@@ -429,6 +433,26 @@ class Daemon:
         if entry.pty is None or not entry.pty.running:
             raise ProtocolException(ErrorCode.SESSION_STOPPED, f"session '{sid}' is not running")
         return entry
+
+    def _submit_enter(self, pty) -> None:
+        """Send Enter as a discrete keypress, slightly after the text write, so a
+        TUI reads it as a separate Return event and submits (a same-chunk CR is
+        swallowed as part of the paste)."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is not None:
+            loop.call_later(0.06, lambda: self._safe_write(pty, b"\r"))
+        else:
+            self._safe_write(pty, b"\r")
+
+    @staticmethod
+    def _safe_write(pty, payload: bytes) -> None:
+        try:
+            pty.write(payload)
+        except OSError:
+            pass
 
     # ---- relay events -------------------------------------------------
     def on_relay_registered(self) -> None:
