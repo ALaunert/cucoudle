@@ -30,7 +30,7 @@ Cucoudle — мобильное приложение для удалённого
   - `@cucoudle/protocol` — zod-схемы versioned envelope, домена сессий, MVP-методов и событий, error codes, JSON-examples и хелперы разбора/сборки сообщений; потребляется как TS-исходники desktop-mirror'ом (Pydantic) и мобилой;
   - `@cucoudle/relay` — Fastify + WebSocket брокер: pairing по коду/QR с выдачей `mobileSessionToken` и reconnect через `mobile.resume`, presence-события, прозрачный форвардинг mobile↔desktop с корреляцией по `id` и fan-out событий desktop→mobile, health-эндпоинты;
   - relay коррелирует forwarded responses по паре desktop/request ID, отклоняет конфликтующие in-flight IDs, завершает зависшие requests по timeout и возвращает `DESKTOP_OFFLINE` при разрыве desktop connection;
-  - канал покрыт unit-, интеграционными и сквозным smoke-тестами (`npx vitest run` — 34 passed), проходит TypeScript typecheck и вручную проверен живым прогоном relay + fake-desktop + fake-mobile;
+  - канал покрыт unit-, интеграционными (включая reconnect через `mobile.resume`) и сквозным smoke-тестами (`npx vitest run` — 36 passed), проходит TypeScript typecheck и вручную проверен живым прогоном relay + fake-desktop + fake-mobile;
   - test toolchain обновлен до Vitest 3.2.7; `npm audit` подтверждает 0 известных vulnerabilities;
   - реальный Python desktop daemon проверен с настоящим relay и WebSocket mobile-клиентом: регистрация, pairing, `session.list`, `mobile.paired` и `mobile.disconnected` прошли end-to-end;
   - подготовлен Docker + Nginx deployment bundle для `relay.launert.dev` с loopback binding контейнера, wildcard TLS и WebSocket proxy timeouts;

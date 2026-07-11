@@ -155,3 +155,17 @@
 **Решения, ограничения и проблемы:** Контейнер публикует relay только на `127.0.0.1:8787`, наружу WebSocket отдает Nginx по TLS. На целевом сервере Node отсутствует, Docker и Nginx доступны только администратору, а выданная SSH-учетка не состоит в sudoers и не имеет доступа к Docker socket. Поэтому deployment не активирован и требует административного запуска описанных команд.
 
 **Следующий шаг:** Администратору применить `deploy/relay/README.md`, после чего проверить `https://relay.launert.dev/healthz` и провести тот же pairing smoke через `wss://relay.launert.dev`.
+
+## 2026-07-11 — Reconnect-тест мобилы
+
+**Цель:** Закрепить reconnect-флоу мобилы автоматическим тестом поверх укреплённого relay.
+
+**Сделано:** Добавлен интеграционный тест `mobile.resume` по WebSocket: re-link после обрыва сокета и повторный форвардинг `session.list`, а также отказ с `UNAUTHORIZED` при неверном токене. Тест проходит против relay с hardening без изменений в relay-коде.
+
+**Затронутые компоненты:** `apps/relay/src/resume.test.ts`, `.gitignore`, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
+
+**Проверки:** `npx vitest run` — 36 passed (7 файлов); `npm run typecheck` — успешно.
+
+**Решения, ограничения и проблемы:** CI на GitHub Actions отложен: текущий токен без scope `workflow` не может публиковать `.github/workflows/*`, workflow-файл не заводим, чтобы не блокировать push. Reconnect остаётся best-effort: replay/snapshot по `seq` — ответственность десктопа.
+
+**Следующий шаг:** Вернуться к CI после расширения scope токена; по готовности mobile-приложения прогнать канал с реальным клиентом.

@@ -51,3 +51,6 @@ build/
 
 # IDE
 .idea/
+
+# Local auto-pull log
+.auto-pull.log
