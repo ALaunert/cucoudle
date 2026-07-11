@@ -363,6 +363,20 @@
 **Решения, ограничения и проблемы:** Relay остаётся в монорепозитории ради единого protocol contract, но является независимой deployable единицей. Nginx — одноразовая инфраструктурная настройка, обычные релизы выполняются без sudo. Workflow не содержит credentials: для активации production deploy нужно добавить dedicated SSH key в GitHub Environment и выставить `RELAY_DEPLOY_ENABLED=true`; GHCR использует short-lived workflow token. До активации текущий bootstrap container продолжает работать.
 
 **Следующий шаг:** Заполнить GitHub Environment secrets/variable, выполнить первый workflow deployment поверх bootstrap image и затем провести desktop daemon pairing smoke через публичный WSS.
+
+## 2026-07-11 — Активация production relay pipeline
+
+**Цель:** Завершить одноразовую настройку CI/CD и подтвердить первый автоматический релиз на `launert.dev`.
+
+**Сделано:** Создано GitHub Environment `relay-production`, dedicated deploy key установлен в Actions Secrets и `authorized_keys`, host key закреплён в secret, repository variable `RELAY_DEPLOY_ENABLED=true` активирована. Workflow run `29149751237` собрал и опубликовал immutable GHCR image, доставил deployment bundle и заменил bootstrap container через штатный `deploy.sh`.
+
+**Затронутые компоненты:** Только GitHub/server configuration и актуальная документация; runtime source не менялся. Секретные значения не записывались в репозиторий и не выводились в workflow.
+
+**Проверки:** Workflow test job и publish/deploy job завершились успешно. Production использует `ghcr.io/alaunert/cucoudle-relay:sha-20bf4c9344cf1e3bde454899e4f988ae6e9ab933`; container healthy, временный user service inactive. Публичные health/readiness и оба WSS route проверены снаружи; прямой порт `8787` недоступен. Fake desktop→relay→mobile подтвердил пересылку `terminal.output` через публичный WSS.
+
+**Решения, ограничения и проблемы:** GHCR pull авторизуется короткоживущим `GITHUB_TOKEN` каждого workflow run, поэтому постоянный registry token на сервере не хранится. Полный Python desktop harness доходит до subscribe, но не получает финальный PTY event через удалённый relay; server-level event forwarding проверен отдельно, поэтому это зафиксировано как desktop-client follow-up, а не deployment blocker.
+
+**Следующий шаг:** Исправить отправку PTY event в Python desktop relay-client при удалённой задержке и повторить полный семистадийный harness через production WSS.
 ## 2026-07-11 — Expo scaffold и mobile test harness
 
 **Цель:** Создать физически совместимую с Expo Go основу мобильного приложения и включить её в общие тестовые и typecheck-команды монорепозитория.

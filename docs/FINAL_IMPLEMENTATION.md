@@ -94,7 +94,7 @@ Expo workspace, mobile test harness, protocol client, pure session state/selecto
 - desktop-daemon пока без tray/GUI и без персистентности сессий в SQLite между рестартами;
 - daemon autostart/login item пока не устанавливается автоматически: текущий CLI setup все еще просит один раз запустить `cucoudle daemon`;
 - relay state остаётся in-memory: Compose переживает crash/reboot, но restart процесса сбрасывает pairing и mobile resume tokens;
-- automated deploy включается repository variable `RELAY_DEPLOY_ENABLED=true` только после добавления SSH/GHCR credentials в защищённое GitHub environment; bootstrap production container уже работает независимо от этого переключателя;
+- automated deploy активен: dedicated SSH credentials хранятся в защищённом GitHub environment, GHCR использует short-lived workflow token, а production работает на immutable image текущего commit SHA;
 - desktop endpoint пока не аутентифицируется device secret; end-to-end шифрование, ключи и ревокация устройств отложены;
 - запуск через Expo Go описан проектно и не подтверждён фактическим запуском на устройстве.
 - актуальный `npm audit` после Expo scaffold сообщает 14 moderate advisories в транзитивной цепочке Expo SDK 54; обновление до предлагаемого Expo 57 противоречит утверждённой совместимости с Expo Go SDK 54, поэтому это открытый блокер будущего zero-vulnerability gate;
