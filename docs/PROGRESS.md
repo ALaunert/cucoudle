@@ -663,3 +663,15 @@
 **Решения, ограничения и проблемы:** Последний вылет не был самопроизвольным: параллельный Claude-агент явно выполнил `brew services stop`, broad `pkill` и удалил `~/.cucoudle/daemon.sock`; это подтверждено process list и Claude transcript. In-memory PTY по-прежнему не переживает намеренный `SIGKILL` daemon; это архитектурное ограничение, а не ошибка renderer.
 
 **Следующий шаг:** Выпустить Homebrew `v0.1.6`, вернуть машину с manual dev-daemon на Homebrew service и провести controlled Claude/Codex smoke без затрагивания чужих сессий.
+
+## 2026-07-11 — Homebrew release v0.1.6
+
+**Цель:** Доставить исправления renderer/terminal cleanup обычным desktop-обновлением.
+
+**Сделано:** Коммит `6c55716` опубликован в `main`, тег `v0.1.6` отправлен в GitHub; Homebrew formula переведена на release tarball с SHA256 `3edac128708a6af9073b7b50e101efc94198ef1c408e43d0aa3a94977a679ca9`.
+
+**Проверки:** Desktop suite 70/70, focused regressions 28/28, Claude control-sequence smoke, compileall и diff check прошли до тега; formula проходит Homebrew style/audit/fetch перед локальной установкой.
+
+**Решения, ограничения и проблемы:** Релиз не обещает persistence при `SIGKILL` daemon; он исключает влияние renderer на PTY и гарантирует полный terminal-mode cleanup при разрыве.
+
+**Следующий шаг:** Обновить локальную установку, перегенерировать shims, вернуть Homebrew service и провести controlled live smoke.
