@@ -56,10 +56,14 @@ Cucoudle — мобильное приложение для удалённого
 - целевой input contract двухуровневый: универсальный terminal parity (`text`, `raw`, arbitrary `bytes`, named `keys` + modifiers) и structured interactions для approval, confirmation, choices и text prompts;
 - semantic Approve/Reject UI создается только desktop provider adapter с exact PTY binding; неизвестные prompt всегда остаются доступны через raw terminal fallback.
 - optional protocol features включаются только из `negotiatedCapabilities`, вычисленных как пересечение offers mobile, relay и desktop; отсутствие capability fields означает совместимый baseline text/raw.
+- для мобильного UI выбрана архитектура `Action Inbox`: главный экран приоритизирует сессии в `waiting`, `error` и завершённые результаты, требующие просмотра; полный список сессий и живой терминал остаются отдельными основными сценариями;
+- утверждена нижняя навигация `Входящие` / `Сессии` / `Новая` / `Настройки`; в MVP `Новая` подключает компьютер, а запуск сессии с телефона только зарезервирован до отдельного контракта;
+- мобильный MVP рассчитан на один активный компьютер и простой моноширинный вывод terminal output; красивый ANSI/TUI-рендеринг отложен;
+- в UI зарезервировано место под `Разрешить` / `Отклонить`; baseline без negotiated capability использует raw terminal fallback, а structured controls включаются только после реализации capability negotiation, desktop bindings и mobile controls.
 
 ### Ещё не реализовано
 
-Мобильное Expo-приложение (`apps/mobile`) пока отсутствует, поэтому канал пока проверен через технический WebSocket mobile-клиент. Расширенные `session.input` modes (`bytes`, `keys`) и structured interactions реализованы на уровне протокола: shared Zod-схемы в `@cucoudle/protocol` и relay-allowlist готовы и покрыты тестами (relay форвардит `interaction.respond` и фанит `interaction.*`). Capability negotiation (offers/`negotiatedCapabilities`) пока только специфицирована и не реализована. Ещё не сделаны: Pydantic-зеркало и key/bytes mapping + provider-детекторы на desktop, mobile offer/controls, capability negotiation в relay/desktop/mobile, tray/settings UI, SQLite persistence и production security. Deployment bundle подготовлен, но не активирован: доступная SSH-учетка не имеет административных прав на Docker и Nginx.
+Мобильное Expo-приложение (`apps/mobile`) пока отсутствует, поэтому канал пока проверен через технический WebSocket mobile-клиент. Для mobile согласован подробный UI-дизайн `Action Inbox`, но код экранов, WebSocket-клиент и запуск на iPhone ещё не реализованы. Расширенные `session.input` modes (`bytes`, `keys`) и structured interactions реализованы на уровне протокола: shared Zod-схемы в `@cucoudle/protocol` и relay-allowlist готовы и покрыты тестами (relay форвардит `interaction.respond` и фанит `interaction.*`). Capability negotiation (offers/`negotiatedCapabilities`) пока только специфицирована и не реализована. Ещё не сделаны: Pydantic-зеркало и key/bytes mapping + provider-детекторы на desktop, mobile offer/controls, capability negotiation в relay/desktop/mobile, tray/settings UI, SQLite persistence и production security. Deployment bundle подготовлен, но не активирован: доступная SSH-учетка не имеет административных прав на Docker и Nginx.
 
 ## Процесс разработки
 
@@ -81,6 +85,9 @@ Cucoudle — мобильное приложение для удалённого
 - конфигурация удаленного TLS endpoint подготовлена, но не применена на сервере из-за отсутствия административных прав у SSH-учетки;
 - desktop endpoint пока не аутентифицируется device secret; end-to-end шифрование, ключи и ревокация устройств отложены;
 - запуск через Expo Go описан проектно и не подтверждён фактическим запуском на устройстве.
+- `waiting` опционален: без desktop-side определения ожидания мобильный UI не пытается угадывать его по сырому терминальному тексту;
+- прямые действия `Разрешить` / `Отклонить` уже описаны target-контрактом и реализованы в TS/Zod + relay routing, но ещё требуют desktop bindings, capability negotiation и mobile controls; запуск сессии с телефона и семантическая лента действий всё ещё требуют будущих расширений;
+- красивый ANSI-рендеринг, code blocks, ссылки и полноценная эмуляция TUI не входят в мобильный MVP.
 
 ## Демонстрационный сценарий
 
@@ -90,5 +97,6 @@ Cucoudle — мобильное приложение для удалённого
 
 1. TypeScript/Zod schemas для input modes и structured interactions и relay allowlist — сделано; осталось: capability offers/intersection (TS + relay) и Pydantic-зеркало на desktop.
 2. Добавить desktop key/bytes mapping и первый provider interaction adapter с stale-response protection.
-3. Реализовать в Expo terminal keyboard, Approve/Reject, choices, text response и raw fallback; повторить полный E2E.
-4. Проверить настоящие Claude/Codex/Cursor prompts на macOS/Linux и iOS/Android.
+3. Составить план и реализовать утверждённый Expo UI `Action Inbox`: pairing, четыре вкладки, status-derived inbox, список сессий, детальный экран с простым терминальным выводом, composer, interrupt и reconnect поверх baseline `@cucoudle/protocol`.
+4. После реализации capability negotiation включить в том же UI terminal keyboard, Approve/Reject, choices и text response с обязательным raw fallback; повторить полный E2E.
+5. Проверить настоящие Claude/Codex/Cursor prompts на macOS/Linux и iOS/Android.

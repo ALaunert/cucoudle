@@ -225,3 +225,16 @@
 **Решения, ограничения и проблемы:** Реализована только протокольная (TS/Zod) сторона + relay allowlist. Pydantic-зеркало на desktop, key/bytes mapping и provider-детекторы интеракций (desktop), а также mobile UI-контролы — вне этой зоны и пока не сделаны. Relay не интерпретирует содержимое интеракций, только форвардит.
 
 **Следующий шаг:** Синхронизировать Pydantic-модели desktop с новыми схемами (через договорённость с разработчиком 1); подготовить сквозной интеграционный harness под interaction-флоу.
+## 2026-07-11 — Проектирование мобильного Action Inbox
+
+**Цель:** Согласовать мобильную информационную архитектуру и UX, совместимые с реализованными relay и shared protocol, до начала разработки Expo-приложения.
+
+**Сделано:** Выбран и детализирован главный экран `Action Inbox`; утверждены pairing-поток, навигация `Входящие` / `Сессии` / `Новая` / `Настройки`, единый экран живой сессии, тёмная визуальная система, reconnect/offline/error-состояния и граница мобильного MVP. `Новая` в MVP подключает один активный компьютер, а запуск сессии зарезервирован на будущее. В action-карточках заложено место под `Разрешить` / `Отклонить`: baseline использует безопасный переход в живую сессию, а structured controls включаются только при negotiated `interaction.structured`. Зафиксировано, что MVP показывает простой моноширинный terminal output, а красивый ANSI/TUI-рендеринг отложен.
+
+**Затронутые компоненты:** `docs/superpowers/specs/2026-07-11-mobile-action-inbox-ui-design.md`, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`; временные визуальные материалы находятся в неотслеживаемом `.superpowers/brainstorm/`.
+
+**Проверки:** Дизайн поэтапно проверен пользователем в browser companion; требования сверены с runtime-схемами `packages/protocol` и target-контрактом `docs/protocol-contracts.md`; отдельно проверено, что baseline UI не включает controls без negotiated capability. Формальный review-loop завершён за три итерации: уточнены manual pairing, reconnect-переходы, dismissal key, обработка `session.ended`/`session.removed` и полный relay WebSocket URL; финальный reviewer status — `Approved`. При rebase учтены более новые target-спеки и runtime-реализация structured interactions/full input modes. После разрешения конфликтов: `git diff --check` — успешно; `npm test` — 52 passed в 9 test files; `npm run typecheck` — успешно; `npm audit` — 0 vulnerabilities.
+
+**Решения, ограничения и проблемы:** `waiting` может отсутствовать без desktop-side detection, поэтому mobile не парсит сырой терминал для определения запросов. Structured permission actions описаны target-контрактом, но останутся скрыты до end-to-end реализации capability negotiation; запуск сессии с телефона, multi-desktop, push, семантическая лента и rich terminal rendering отложены. Мобильное приложение пока не реализовано.
+
+**Следующий шаг:** Получить финальное подтверждение записанной спецификации и перейти к подробному плану реализации Expo-приложения.
