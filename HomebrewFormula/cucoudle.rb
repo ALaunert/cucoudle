@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Cucoudle < Formula
   include Language::Python::Virtualenv
 
@@ -6,21 +8,30 @@ class Cucoudle < Formula
   url "https://github.com/ALaunert/cucoudle/archive/refs/tags/v0.1.0.tar.gz"
   sha256 "b66464bdac94096c9abb13f2750928eee6f6d3a593feaaab65940bd18d30de76"
   license "MIT"
+  revision 1
   head "https://github.com/ALaunert/cucoudle.git", branch: "main"
 
+  depends_on "pydantic"
   depends_on "python@3.13"
 
-  revision 1
+  resource "qrcode" do
+    url "https://files.pythonhosted.org/packages/8f/b2/7fc2931bfae0af02d5f53b174e9cf701adbb35f39d69c2af63d4a39f81a9/qrcode-8.2.tar.gz"
+    sha256 "35c3f2a4172b33136ab9f6b3ef1c00260dd2f66f858f24d88418a015f446506c"
+  end
+
+  resource "websockets" do
+    url "https://files.pythonhosted.org/packages/8c/02/b9a097e1e16fee4e2fd1ec8c39f6a9c5d6257bae8fa12640caf869f54436/websockets-16.1.tar.gz"
+    sha256 "299468cbe42e2b9981134c7c51d99387d8a7bf562b00183b3eec53f882846dad"
+  end
 
   def install
-    # The desktop client lives in apps/desktop. Build an isolated virtualenv in
-    # libexec and install the package together with its dependencies
-    # (pydantic/websockets/qrcode wheels from PyPI — no Rust toolchain needed).
-    # Homebrew's venv.pip_install always passes --no-deps, so we bootstrap pip
-    # and call it directly instead.
-    virtualenv_create(libexec, "python3.13")
-    system libexec/"bin/python", "-m", "ensurepip", "--upgrade"
-    system libexec/"bin/python", "-m", "pip", "install", buildpath/"apps/desktop"
+    # pydantic comes from its bottled formula; Homebrew adds dependency Python
+    # paths to the virtualenv. The pure/C resources below require no Rust.
+    venv = virtualenv_create(libexec, "python3.13")
+    venv.pip_install resources
+    cd "apps/desktop" do
+      venv.pip_install Pathname.pwd
+    end
     bin.install_symlink libexec/"bin/cucoudle"
   end
 
@@ -48,8 +59,6 @@ class Cucoudle < Formula
 
   test do
     assert_match "cucoudle", shell_output("#{bin}/cucoudle --version")
-    # --version passes even without runtime deps; importing the daemon module
-    # proves pydantic/websockets actually landed in the venv.
-    system libexec/"bin/python", "-c", "import cucoudle_desktop.daemon"
+    system libexec/"bin/python", "-c", "import pydantic, qrcode, websockets"
   end
 end

@@ -52,7 +52,7 @@ Cucoudle — мобильное приложение для удалённого
   - установщик обнаруживает реальные бинари (исключая каталог shim'ов), генерирует shim'ы и идемпотентно правит shell-rc маркированным PATH-блоком с бэкапом (`install`/`uninstall`/`doctor`);
   - shell integration поддерживает zsh/bash/sh и fish, а generated shims используют portable `python3` shebang и не зависят от пути временного virtualenv;
   - desktop uninstall останавливает daemon, удаляет shims/PATH integration и опционально полностью очищает `~/.cucoudle`; self-contained purge script доступен для clean-slate тестов даже при сломанном Python environment;
-  - desktop распространяется через Homebrew third-party tap (`brew tap alaunert/cucoudle && brew install cucoudle`): формула собирает virtualenv в libexec, устанавливает пакет вместе с runtime-зависимостями (pydantic/websockets/qrcode) через bootstrapped pip и регистрирует `brew services`-демон; тест формулы импортирует daemon-модуль, подтверждая наличие зависимостей;
+  - Homebrew formula устанавливает CLI в isolated virtualenv, включает `service do` для одного LaunchAgent daemon через `brew services`, использует bottled `pydantic` и pinned qrcode/websockets resources без пользовательского Rust toolchain;
   - демон — источник правды по сессиям: Unix-сокет-мост локального терминала + control-канал, единый монотонный `seq`, буфер вывода и `session.subscribe` в режимах `live`/`replay`/`snapshot`, relay-клиент с `desktop.register`/`desktop.pairing.create` и обработкой форварднутых mobile-запросов и событий;
   - production relay URL встроен в desktop как `wss://relay.launert.dev`; пользователь не вводит адрес, старый localhost-default мигрирует автоматически, а локальная разработка использует только environment override;
   - покрыто 38 тестами (`pytest`) и живым прогоном: реальный shim под PTY ↔ демон ↔ управляемый `/bin/cat`, зеркалирование ввода/вывода, live-листинг сессии и завершение по Ctrl+C; relay-клиент проверен против mock-relay.
@@ -114,7 +114,7 @@ One chat.»). Дек рассчитан на аудиторию жюри и ис
 
 - pairing, Inbox, Sessions, live Session detail, reconnect и recovery UI готовы и покрыты component/application tests, но финальный production runtime smoke и физический iPhone smoke ещё не завершены; реальный desktop-daemon и relay пока проверены с техническим mobile-клиентом и управляемой PTY-сессией, но не с Expo-приложением и настоящим Claude/Codex/Cursor процессом;
 - desktop-daemon пока без tray/GUI и без персистентности сессий в SQLite между рестартами;
-- daemon autostart/login item пока не устанавливается автоматически: текущий CLI setup все еще просит один раз запустить `cucoudle daemon`;
+- Homebrew install поддерживает background daemon/autostart после разовой команды `brew services start cucoudle`; generic pip/CLI install пока не устанавливает systemd user service или LaunchAgent автоматически;
 - relay state остаётся in-memory: Compose переживает crash/reboot, но restart процесса сбрасывает pairing и mobile resume tokens;
 - automated deploy активен: dedicated SSH credentials хранятся в защищённом GitHub environment, GHCR использует short-lived workflow token, а production работает на immutable image текущего commit SHA;
 - desktop endpoint пока не аутентифицируется device secret; end-to-end шифрование, ключи и ревокация устройств отложены;

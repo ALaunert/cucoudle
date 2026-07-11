@@ -13,9 +13,10 @@ brew services start cucoudle   # run the daemon in the background (autostart)
 ```
 
 `brew install` gives the global `cucoudle` command (no alias, no venv). The
-formula builds an isolated virtualenv and `pip install`s the `apps/desktop`
-package (pydantic/websockets/qrcode come as PyPI wheels — no Rust/compiler), then
-links `cucoudle` onto PATH. A `service` block integrates with `brew services`.
+formula builds an isolated virtualenv and installs the `apps/desktop` package.
+Pydantic comes from its bottled Homebrew formula, while pinned qrcode/websockets
+resources are installed into the virtualenv; users do not need Rust. The
+`service` block integrates with `brew services`.
 The relay is a hosted service (`relay.launert.dev`) and is never installed here.
 
 Bleeding edge (build from `main`): `brew install --HEAD cucoudle`.

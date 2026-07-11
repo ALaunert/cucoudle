@@ -472,3 +472,17 @@
 **Решения, ограничения и проблемы:** Для third-party tap выбран прямой pip с сетевым доступом вместо resource-блоков Homebrew: sdist `pydantic-core` требует Rust/maturin, а wheels с PyPI — нет. Пользователям с уже сломанной установкой нужен `brew update && brew reinstall cucoudle` (и `brew services restart cucoudle`, если демон запущен как сервис).
 
 **Следующий шаг:** Продолжить Task 14 (production runtime composition и mobile smoke); при следующем релизе убрать `revision` вместе с бампом версии.
+
+## 2026-07-11 — Рабочий Homebrew daemon service без Rust
+
+**Цель:** Запускать один desktop daemon в фоне через `brew services start cucoudle` и устранить падение чистой Homebrew-установки из-за отсутствующих Python dependencies.
+
+**Сделано:** Подтверждено, что существующий `service do` корректно создаёт LaunchAgent с `keep_alive`; фактическое падение было вызвано тем, что `venv.pip_install` ставит локальный desktop package без dependencies. Formula теперь зависит от bottled `pydantic`, а qrcode/websockets зафиксированы Homebrew resources с SHA256 и явно устанавливаются в virtualenv. Formula test импортирует все runtime modules. Текущая локальная Cellar-установка восстановлена, service запущен.
+
+**Затронутые компоненты:** `HomebrewFormula/cucoudle.rb`, Homebrew deployment guide и актуальная документация. Desktop daemon runtime/protocol не менялся.
+
+**Проверки:** Выполнен clean uninstall/install `--HEAD` на реальной macOS arm64: Homebrew установил bottled `pydantic` и оба pinned resources, `brew test` и явный import `pydantic, qrcode, websockets` прошли. `brew services info cucoudle` показывает `Running: true`, daemon socket — running, а production relay получил `desktop.registered` для macOS app version `0.1.0`. Отдельный Linux desktop также зарегистрировался, отправил `session.updated` и создал pairing request.
+
+**Решения, ограничения и проблемы:** Пользователь один раз запускает `brew services start cucoudle`; после этого daemon общий для всех терминалов, работает через LaunchAgent и не требует открытого terminal window. Bottled `pydantic` исключает локальную Rust-сборку; generic non-Homebrew Linux install всё ещё требует отдельного systemd user integration.
+
+**Следующий шаг:** Опубликовать formula fix; пользователям установленного stable `0.1.0` потребуется `brew update && brew upgrade cucoudle`, после чего достаточно одной команды `brew services start cucoudle`.
