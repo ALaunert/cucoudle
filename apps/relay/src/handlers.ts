@@ -16,11 +16,13 @@ import {
 } from "@cucoudle/protocol";
 import { RelayState, type MobileConn } from "./state.js";
 
-const MOBILE_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+export const DEFAULT_MOBILE_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+export const DEFAULT_DESKTOP_RESPONSE_TIMEOUT_MS = 15_000;
 const FORWARDED = new Set<string>(MOBILE_FORWARDED_METHODS);
 const DESKTOP_EVENT_SET = new Set<string>(DESKTOP_EVENTS);
 
 function send(socket: WebSocket, msg: unknown): void {
+  if ("readyState" in socket && socket.readyState !== 1) return;
   socket.send(JSON.stringify(msg));
 }
 
@@ -32,7 +34,7 @@ export function handleDesktopMessage(
 ): void {
   const parsed = parseWireMessage(raw);
   if (!parsed.ok) {
-    send(socket, makeError("", parsed.code, parsed.message));
+    send(socket, makeError(parsed.id, parsed.code, parsed.message));
     return;
   }
   const msg = parsed.msg;
@@ -56,9 +58,10 @@ export function handleDesktopMessage(
   }
 
   if (isResponse(msg)) {
-    const mobile = state.pending.get(msg.id);
+    const desktopId = findDesktopId(state, socket);
+    if (!desktopId) return;
+    const mobile = state.takePending(desktopId, msg.id);
     if (mobile) {
-      state.pending.delete(msg.id);
       send(mobile.socket, msg);
     }
     return;
@@ -73,10 +76,18 @@ export function handleDesktopMessage(
   }
 }
 
-export function handleMobileMessage(state: RelayState, socket: WebSocket, raw: string): void {
+export function handleMobileMessage(
+  state: RelayState,
+  socket: WebSocket,
+  raw: string,
+  options: {
+    mobileSessionTtlMs?: number;
+    desktopResponseTimeoutMs?: number;
+  } = {},
+): void {
   const parsed = parseWireMessage(raw);
   if (!parsed.ok) {
-    send(socket, makeError("", parsed.code, parsed.message));
+    send(socket, makeError(parsed.id, parsed.code, parsed.message));
     return;
   }
   const msg = parsed.msg;
@@ -90,7 +101,12 @@ export function handleMobileMessage(state: RelayState, socket: WebSocket, raw: s
     const consumed = state.consumePairing(p.data.desktopId, p.data.pairingCode, Date.now());
     if (!consumed.ok) return send(socket, makeError(msg.id, consumed.code, "pairing failed"));
 
-    const issued = state.issueMobileSession(p.data.desktopId, p.data.mobileDevice.id, MOBILE_SESSION_TTL_MS, Date.now());
+    const issued = state.issueMobileSession(
+      p.data.desktopId,
+      p.data.mobileDevice.id,
+      options.mobileSessionTtlMs ?? DEFAULT_MOBILE_SESSION_TTL_MS,
+      Date.now(),
+    );
     const conn: MobileConn = {
       mobileDeviceId: p.data.mobileDevice.id,
       mobileDevice: p.data.mobileDevice,
@@ -135,7 +151,19 @@ export function handleMobileMessage(state: RelayState, socket: WebSocket, raw: s
     if (!conn) return send(socket, makeError(msg.id, "MOBILE_NOT_PAIRED", "pair before sending session commands"));
     const desktop = state.getDesktop(conn.desktopId);
     if (!desktop) return send(socket, makeError(msg.id, "DESKTOP_OFFLINE", "desktop is offline"));
-    state.pending.set(msg.id, conn);
+    const added = state.addPending(
+      desktop.desktopId,
+      msg.id,
+      conn,
+      options.desktopResponseTimeoutMs ?? DEFAULT_DESKTOP_RESPONSE_TIMEOUT_MS,
+      (pendingMobile) => send(
+        pendingMobile.socket,
+        makeError(msg.id, "INTERNAL_ERROR", "desktop response timed out"),
+      ),
+    );
+    if (!added) {
+      return send(socket, makeError(msg.id, "INVALID_MESSAGE", "request id is already in flight"));
+    }
     send(desktop.socket, msg);
     return;
   }
@@ -144,7 +172,11 @@ export function handleMobileMessage(state: RelayState, socket: WebSocket, raw: s
 }
 
 export function onDesktopClose(state: RelayState, socket: WebSocket): void {
-  state.removeDesktopBySocket(socket);
+  const desktopId = state.removeDesktopBySocket(socket);
+  if (!desktopId) return;
+  for (const pending of state.removePendingForDesktop(desktopId)) {
+    send(pending.mobile.socket, makeError(pending.requestId, "DESKTOP_OFFLINE", "desktop disconnected"));
+  }
 }
 
 export function onMobileClose(state: RelayState, socket: WebSocket): void {

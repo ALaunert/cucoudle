@@ -80,15 +80,19 @@ export function isEvent(m: WireMessage): m is EventMessage {
 
 type ParseResult =
   | { ok: true; msg: WireMessage }
-  | { ok: false; code: ErrorCode; message: string };
+  | { ok: false; id: string; code: ErrorCode; message: string };
 
 export function parseWireMessage(raw: string): ParseResult {
   let json: unknown;
   try {
     json = JSON.parse(raw);
   } catch {
-    return { ok: false, code: "INVALID_MESSAGE", message: "payload is not valid JSON" };
+    return { ok: false, id: "", code: "INVALID_MESSAGE", message: "payload is not valid JSON" };
   }
+  const id =
+    typeof json === "object" && json !== null && "id" in json && typeof json.id === "string"
+      ? json.id
+      : "";
   if (
     typeof json === "object" &&
     json !== null &&
@@ -97,13 +101,14 @@ export function parseWireMessage(raw: string): ParseResult {
   ) {
     return {
       ok: false,
+      id,
       code: "UNSUPPORTED_PROTOCOL",
       message: `expected protocol ${PROTOCOL_VERSION}`,
     };
   }
   const parsed = WireMessageSchema.safeParse(json);
   if (!parsed.success) {
-    return { ok: false, code: "INVALID_MESSAGE", message: parsed.error.message };
+    return { ok: false, id, code: "INVALID_MESSAGE", message: parsed.error.message };
   }
   return { ok: true, msg: parsed.data };
 }

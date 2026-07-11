@@ -39,6 +39,19 @@ describe("RelayState pairing", () => {
     expect(res).toMatchObject({ ok: false, code: "PAIRING_NOT_FOUND" });
   });
 
+  it("invalidates the previous pairing code for the same desktop", () => {
+    const s = new RelayState();
+    const now = Date.parse("2026-07-11T10:00:00Z");
+    const first = s.createPairing("desk_1", 300, RELAY_URL, now);
+    const second = s.createPairing("desk_1", 300, RELAY_URL, now + 1000);
+
+    expect(s.consumePairing("desk_1", first.pairingCode, now + 2000)).toMatchObject({
+      ok: false,
+      code: "PAIRING_NOT_FOUND",
+    });
+    expect(s.consumePairing("desk_1", second.pairingCode, now + 2000)).toEqual({ ok: true });
+  });
+
   it("resumes with a valid token and rejects a bad token", () => {
     const s = new RelayState();
     s.registerDesktop({ desktopId: "desk_1", desktopName: "Mac", platform: "macos", appVersion: "0.1.0" }, fakeSocket());

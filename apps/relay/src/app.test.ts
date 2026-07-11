@@ -68,4 +68,26 @@ describe("relay app", () => {
     expect(msg).toMatchObject({ ok: false, error: { code: "INVALID_MESSAGE" } });
     ws.close();
   });
+
+  it("preserves the request id in an unsupported protocol response", async () => {
+    const started = await listen();
+    app = started.app;
+    const ws = new WebSocket(`ws://127.0.0.1:${started.port}/v1/ws/mobile`);
+    await once(ws, "open");
+    ws.send(JSON.stringify({
+      version: "2025-01-01",
+      kind: "request",
+      id: "old_req",
+      method: "session.list",
+      sentAt: "2026-07-11T10:00:00Z",
+    }));
+
+    const raw = (await once(ws, "message")) as Buffer;
+    expect(JSON.parse(raw.toString())).toMatchObject({
+      id: "old_req",
+      ok: false,
+      error: { code: "UNSUPPORTED_PROTOCOL" },
+    });
+    ws.close();
+  });
 });

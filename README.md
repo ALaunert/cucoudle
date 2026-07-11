@@ -24,6 +24,8 @@ npm test                   # прогон protocol + relay
 
 Health: `curl localhost:8787/healthz` и `curl localhost:8787/readyz`.
 
+Для удаленного запуска relay принимает `PORT`, публичный mobile WebSocket URL в `RELAY_MOBILE_URL`, время жизни resume token в `MOBILE_SESSION_TTL_SECONDS` и timeout ответа desktop в `DESKTOP_RESPONSE_TIMEOUT_MS`. Секреты и SSH credentials в конфигурацию репозитория не добавляются.
+
 ### Сквозной smoke без реальных приложений
 
 Три терминала:

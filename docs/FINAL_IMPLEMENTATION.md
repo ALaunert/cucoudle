@@ -29,7 +29,9 @@ Cucoudle — мобильное приложение для удалённого
   - монорепо на npm workspaces с пакетами `@cucoudle/protocol` и `@cucoudle/relay`;
   - `@cucoudle/protocol` — zod-схемы versioned envelope, домена сессий, MVP-методов и событий, error codes, JSON-examples и хелперы разбора/сборки сообщений; потребляется как TS-исходники desktop-mirror'ом (Pydantic) и мобилой;
   - `@cucoudle/relay` — Fastify + WebSocket брокер: pairing по коду/QR с выдачей `mobileSessionToken` и reconnect через `mobile.resume`, presence-события, прозрачный форвардинг mobile↔desktop с корреляцией по `id` и fan-out событий desktop→mobile, health-эндпоинты;
-  - канал покрыт unit-, интеграционными и сквозным smoke-тестами (`npx vitest run` — 29 passed) и вручную проверен живым прогоном relay + fake-desktop + fake-mobile.
+  - relay коррелирует forwarded responses по паре desktop/request ID, отклоняет конфликтующие in-flight IDs, завершает зависшие requests по timeout и возвращает `DESKTOP_OFFLINE` при разрыве desktop connection;
+  - канал покрыт unit-, интеграционными и сквозным smoke-тестами (`npx vitest run` — 34 passed), проходит TypeScript typecheck и вручную проверен живым прогоном relay + fake-desktop + fake-mobile;
+  - test toolchain обновлен до Vitest 3.2.7; `npm audit` подтверждает 0 известных vulnerabilities.
 
 ## Архитектура и технологический стек
 
@@ -64,7 +66,7 @@ Desktop-daemon с PTY-мостом и shell-shims (`apps/desktop`) и мобил
 - нет desktop-daemon (PTY-мост, shell-shims) и мобильного UI — канал проверен только на fake-клиентах;
 - relay in-memory: при рестарте pairing и `mobileSessionToken` теряются;
 - удалённый доступ вне LAN (публичный адрес/tunnel для relay) не настроен;
-- production-безопасность (end-to-end шифрование, ключи и ревокация устройств) отложена;
+- desktop endpoint пока не аутентифицируется device secret; end-to-end шифрование, ключи и ревокация устройств отложены;
 - запуск через Expo Go описан проектно и не подтверждён фактическим запуском на устройстве.
 
 ## Демонстрационный сценарий

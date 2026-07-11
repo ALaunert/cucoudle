@@ -9,8 +9,8 @@ afterEach(async () => {
   app = undefined;
 });
 
-async function listen(): Promise<number> {
-  app = buildApp("ws://127.0.0.1/v1/ws/mobile");
+async function listen(options: { desktopResponseTimeoutMs?: number } = {}): Promise<number> {
+  app = buildApp("ws://127.0.0.1/v1/ws/mobile", options);
   await app.listen({ port: 0, host: "127.0.0.1" });
   const address = app.server.address();
   if (address === null || typeof address === "string") throw new Error("no port");
@@ -136,5 +136,48 @@ describe("forwarding", () => {
     const evt = await gone;
     expect(evt.data.mobileDeviceId).toBe("mob_a");
     desktop.close();
+  });
+
+  it("rejects a duplicate in-flight request id", async () => {
+    const port = await listen();
+    const { desktop, mobile } = await pairedPair(port);
+    const forwarded = nextMessage(desktop, (m) => m.kind === "request" && m.id === "same_id");
+
+    mobile.send(req("session.list", "same_id", {}));
+    await forwarded;
+    const rejection = nextMessage(mobile, (m) => m.id === "same_id" && m.ok === false);
+    mobile.send(req("session.list", "same_id", {}));
+
+    const rejected = await rejection;
+    expect(rejected.error.code).toBe("INVALID_MESSAGE");
+    desktop.close();
+    mobile.close();
+  });
+
+  it("rejects pending requests when desktop disconnects", async () => {
+    const port = await listen();
+    const { desktop, mobile } = await pairedPair(port);
+    const forwarded = nextMessage(desktop, (m) => m.kind === "request" && m.id === "pending_1");
+
+    mobile.send(req("session.list", "pending_1", {}));
+    await forwarded;
+    const rejection = nextMessage(mobile, (m) => m.id === "pending_1");
+    desktop.close();
+
+    const rejected = await rejection;
+    expect(rejected).toMatchObject({ ok: false, error: { code: "DESKTOP_OFFLINE" } });
+    mobile.close();
+  });
+
+  it("times out a forwarded request when desktop does not respond", async () => {
+    const port = await listen({ desktopResponseTimeoutMs: 20 });
+    const { desktop, mobile } = await pairedPair(port);
+
+    const rejection = nextMessage(mobile, (m) => m.id === "slow_1");
+    mobile.send(req("session.list", "slow_1", {}));
+    const rejected = await rejection;
+    expect(rejected).toMatchObject({ ok: false, error: { code: "INTERNAL_ERROR" } });
+    desktop.close();
+    mobile.close();
   });
 });

@@ -681,6 +681,21 @@ Desktop assigns `seq` to terminal events. Mobile uses `seq` only for display rec
 
 Request `id` should be unique per client process. If a response is lost, mobile may retry idempotent requests such as `session.list` and `session.subscribe`. Mobile should not blindly retry `session.input` because duplicate input would be user-visible.
 
+The MVP relay preserves request IDs when forwarding. It allows only one in-flight request with a given `id` per desktop. A concurrent duplicate is rejected with `INVALID_MESSAGE`; this prevents a response from being routed to the wrong mobile connection without rewriting the desktop/mobile envelope.
+
+## Relay runtime behavior
+
+The implemented hackathon relay uses in-memory state:
+
+- pairing codes are six digits, single-use and scoped to one desktop;
+- creating a new pairing code invalidates the previous code for that desktop;
+- mobile resume tokens expire after eight hours by default;
+- forwarded desktop requests time out after 15 seconds by default;
+- desktop disconnect rejects its pending mobile requests with `DESKTOP_OFFLINE`;
+- relay restart invalidates pairing codes and mobile resume tokens.
+
+The timeout and token lifetime are configurable through relay environment variables. Persistent device identity, desktop device-secret authentication, token revocation and multi-instance state are post-hackathon security work, not implemented MVP behavior.
+
 ## Frontend rendering contract
 
 Mobile sessions list requires:

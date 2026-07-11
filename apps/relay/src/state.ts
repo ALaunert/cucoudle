@@ -20,6 +20,12 @@ export type MobileConn = {
 
 type Pairing = { desktopId: string; expiresAt: number };
 type MobileSession = { desktopId: string; mobileDeviceId: string; expiresAt: number };
+type PendingRequest = {
+  desktopId: string;
+  requestId: string;
+  mobile: MobileConn;
+  timeout: ReturnType<typeof setTimeout>;
+};
 
 export function generatePairingCode(): string {
   return randomInt(0, 1_000_000).toString().padStart(6, "0");
@@ -37,12 +43,17 @@ export class RelayState {
   private readonly pairings = new Map<string, Pairing>();
   private readonly mobileSessions = new Map<string, MobileSession>();
   readonly links = new Map<string, Set<MobileConn>>();
-  readonly pending = new Map<string, MobileConn>();
+  private readonly pending = new Map<string, PendingRequest>();
 
   registerDesktop(
     params: { desktopId: string; desktopName: string; platform: string; appVersion: string },
     socket: WebSocket,
   ): void {
+    for (const [id, connection] of this.desktops) {
+      if (connection.socket === socket && id !== params.desktopId) this.desktops.delete(id);
+    }
+    const existing = this.desktops.get(params.desktopId);
+    if (existing && existing.socket !== socket) existing.socket.close(4001, "replaced by a new connection");
     this.desktops.set(params.desktopId, {
       desktopId: params.desktopId,
       name: params.desktopName,
@@ -72,7 +83,13 @@ export class RelayState {
     relayMobileUrl: string,
     now: number,
   ): { pairingCode: string; expiresAt: string; qrPayload: QrPayload } {
-    const pairingCode = generatePairingCode();
+    for (const [code, pairing] of this.pairings) {
+      if (pairing.desktopId === desktopId) this.pairings.delete(code);
+    }
+    let pairingCode: string;
+    do {
+      pairingCode = generatePairingCode();
+    } while (this.pairings.has(pairingCode));
     const expiresAtMs = now + ttlSeconds * 1000;
     this.pairings.set(pairingCode, { desktopId, expiresAt: expiresAtMs });
     const expiresAt = new Date(expiresAtMs).toISOString();
@@ -135,8 +152,11 @@ export class RelayState {
         if (conn.socket === socket) {
           set.delete(conn);
           if (set.size === 0) this.links.delete(desktopId);
-          for (const [id, mob] of this.pending) {
-            if (mob.socket === socket) this.pending.delete(id);
+          for (const [key, pending] of this.pending) {
+            if (pending.mobile.socket === socket) {
+              clearTimeout(pending.timeout);
+              this.pending.delete(key);
+            }
           }
           return { mobileDeviceId: conn.mobileDeviceId, desktopId };
         }
@@ -147,5 +167,49 @@ export class RelayState {
 
   mobilesForDesktop(desktopId: string): MobileConn[] {
     return [...(this.links.get(desktopId) ?? [])];
+  }
+
+  addPending(
+    desktopId: string,
+    requestId: string,
+    mobile: MobileConn,
+    timeoutMs: number,
+    onTimeout: (mobile: MobileConn) => void,
+  ): boolean {
+    const key = this.pendingKey(desktopId, requestId);
+    if (this.pending.has(key)) return false;
+    const timeout = setTimeout(() => {
+      const pending = this.pending.get(key);
+      if (!pending) return;
+      this.pending.delete(key);
+      onTimeout(pending.mobile);
+    }, timeoutMs);
+    timeout.unref();
+    this.pending.set(key, { desktopId, requestId, mobile, timeout });
+    return true;
+  }
+
+  takePending(desktopId: string, requestId: string): MobileConn | undefined {
+    const key = this.pendingKey(desktopId, requestId);
+    const pending = this.pending.get(key);
+    if (!pending) return undefined;
+    clearTimeout(pending.timeout);
+    this.pending.delete(key);
+    return pending.mobile;
+  }
+
+  removePendingForDesktop(desktopId: string): Array<{ requestId: string; mobile: MobileConn }> {
+    const removed: Array<{ requestId: string; mobile: MobileConn }> = [];
+    for (const [key, pending] of this.pending) {
+      if (pending.desktopId !== desktopId) continue;
+      clearTimeout(pending.timeout);
+      this.pending.delete(key);
+      removed.push({ requestId: pending.requestId, mobile: pending.mobile });
+    }
+    return removed;
+  }
+
+  private pendingKey(desktopId: string, requestId: string): string {
+    return `${desktopId}\u0000${requestId}`;
   }
 }

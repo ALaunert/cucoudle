@@ -26,7 +26,7 @@ describe("parseWireMessage", () => {
 
   it("rejects non-JSON with INVALID_MESSAGE", () => {
     const res = parseWireMessage("not json{");
-    expect(res).toEqual({ ok: false, code: "INVALID_MESSAGE", message: expect.any(String) });
+    expect(res).toEqual({ ok: false, id: "", code: "INVALID_MESSAGE", message: expect.any(String) });
   });
 
   it("rejects a wrong protocol version with UNSUPPORTED_PROTOCOL", () => {
@@ -38,7 +38,7 @@ describe("parseWireMessage", () => {
       sentAt: "2026-07-11T10:00:00Z",
     });
     const res = parseWireMessage(raw);
-    expect(res).toMatchObject({ ok: false, code: "UNSUPPORTED_PROTOCOL" });
+    expect(res).toMatchObject({ ok: false, id: "req_1", code: "UNSUPPORTED_PROTOCOL" });
   });
 
   it("rejects a structurally invalid envelope with INVALID_MESSAGE", () => {
