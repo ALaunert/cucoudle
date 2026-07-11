@@ -543,3 +543,13 @@
 **Решения, ограничения и проблемы:** Credential-поля маскируются, но произвольный terminal text может сам содержать секреты; режим предназначен только для временного тестового окружения и должен выключаться перед обычной эксплуатацией.
 
 **Следующий шаг:** Развернуть relay и использовать `message.received.payload` для проверки полного Linux/macOS/mobile потока.
+
+## 2026-07-11 — Production-проверка protocol payload logs
+
+**Цель:** Подтвердить, что полное логирование работает на production relay, а credential-поля не раскрываются.
+
+**Сделано:** Relay release `8065426` развёрнут на `relay.launert.dev`, container healthcheck прошёл, `RELAY_LOG_PAYLOADS=true` активен. Изолированный public WSS smoke-test прошёл цепочку desktop register/pairing, mobile pair/subscribe/input и desktop terminal output.
+
+**Проверки:** Production JSON logs содержат полный `message.received.payload` с тестовым input/output text; `pairingCode` заменён на `<redacted>`, немаскированных pairing fields не найдено. GitHub Actions run `29152110482` завершён успешно.
+
+**Следующий шаг:** Использовать production logs для проверки живых Linux/macOS CLI-сессий; после тестов отключить payload/text logging.
