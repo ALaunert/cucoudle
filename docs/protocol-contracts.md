@@ -705,7 +705,7 @@ Mobile request:
   "method": "session.input",
   "params": {
     "sessionId": "sess_1",
-    "data": "continue with the minimal implementation\\n",
+    "data": "continue with the minimal implementation",
     "inputMode": "text",
     "submit": true
   },
@@ -728,7 +728,7 @@ Desktop response:
 }
 ```
 
-Legacy `inputMode` behavior shown in the request above:
+Legacy `inputMode` behavior:
 
 - `text`: app composer input; mobile should append `\n` when sending a submitted message;
 - `raw`: terminal-mode input; mobile sends exact bytes represented as a string.

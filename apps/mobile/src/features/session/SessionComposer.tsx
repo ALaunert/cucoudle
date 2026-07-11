@@ -39,7 +39,8 @@ export function SessionComposer({
       const result = await onSendInput({
         sessionId,
         inputMode: "text",
-        data: `${draft}\n`,
+        data: draft,
+        submit: true,
       });
       if (!result.accepted) throw new Error("Команда не принята");
       setDraft("");

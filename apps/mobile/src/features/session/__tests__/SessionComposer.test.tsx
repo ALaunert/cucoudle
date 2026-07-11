@@ -25,7 +25,7 @@ function renderComposer(
   return props;
 }
 
-test("sends one newline-terminated text input and clears only after success", async () => {
+test("sends submitted text input and clears only after success", async () => {
   const send = deferred<{ accepted: boolean }>();
   const onSendInput = jest.fn(() => send.promise);
   renderComposer({ onSendInput });
@@ -38,7 +38,8 @@ test("sends one newline-terminated text input and clears only after success", as
   expect(onSendInput).toHaveBeenCalledWith({
     sessionId: "session-1",
     inputMode: "text",
-    data: "npm test\n",
+    data: "npm test",
+    submit: true,
   });
   expect(input.props.value).toBe("npm test");
   expect(screen.getByRole("button", { name: "Отправка…" })).toBeDisabled();

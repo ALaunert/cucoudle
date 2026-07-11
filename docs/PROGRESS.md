@@ -567,3 +567,17 @@
 **Решения, ограничения и проблемы:** Имена линз камеры локализуются системой, поэтому широкоугольная выбирается как линза с самым коротким именем — эвристика, а не API-гарантия. Полный smoke Expo-приложения на физическом iPhone отдельной автоматической проверкой не зафиксирован.
 
 **Следующий шаг:** Зафиксировать сквозной demo-прогон телефон ↔ прод-relay ↔ desktop с настоящим CLI-агентом и записать его для презентации.
+
+## 2026-07-11 — Исправление отправки Enter из мобильного terminal composer
+
+**Цель:** Исправить мобильный ввод, при котором текст появлялся в интерактивном CLI, но не подтверждался клавишей Enter.
+
+**Сделано:** Mobile composer переведён с legacy-добавления `\n` на контрактный payload с чистым текстом и `submit: true`. Desktop daemon теперь преобразует такой submit в реальную PTY-последовательность Enter (`\r`). Для совместимости payload, уже оканчивающийся на `\r` или `\n`, повторно не завершается. Пример протокола синхронизирован с фактическим поведением.
+
+**Затронутые компоненты:** `apps/mobile/src/features/session/SessionComposer.tsx` и его regression test; обработчик `session.input` и тесты daemon в `apps/desktop`; `docs/protocol-contracts.md`, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
+
+**Проверки:** Mobile focused composer suite — 6/6; полный mobile Jest suite — 145/145; mobile TypeScript typecheck — успешно; desktop daemon suite — 9/9, включая новые проверки `submit: true` → `\r` и отсутствия двойного Enter для legacy newline; Python compileall и `git diff --check` — успешно.
+
+**Решения, ограничения и проблемы:** Enter формируется на desktop, поскольку именно desktop владеет PTY и знает его управляющую последовательность. Automatic retry ввода по-прежнему запрещён, чтобы команда не выполнялась дважды. Физический iPhone/Expo runtime smoke ещё не выполнен.
+
+**Следующий шаг:** Перезапустить desktop daemon и Expo-приложение, подтвердить отправку ответа в настоящих Codex/Claude сессиях с телефона и затем завершить общий Task 14 runtime smoke.
