@@ -376,3 +376,17 @@
 **Решения, ограничения и проблемы:** Expo scaffold является только технической основой: pairing, mobile protocol client, session state и продуктовые экраны ещё не реализованы. После установки Expo SDK 54 `npm audit --json` сообщает 14 moderate advisories в транзитивной Expo dependency chain; npm предлагает только несовместимый переход на Expo 57, поэтому Task 1 не маскирует результат как zero-vulnerability, а следующему обязательному audit gate потребуется отдельное совместимое решение. Git remote fetch/pull был заблокирован политикой выполнения среды до запуска команды; локальная ветка при старте показывала `main...origin/main` без расхождения, tracked-изменений не было, а неизвестные `.superpowers/`, session prompt и `docs/SESSION_HANDOFF.md` не изменялись и не добавлялись.
 
 **Следующий шаг:** Параллельно реализовать Wave 1: request-correlated mobile protocol client, pure session state/selectors и approved dark UI kit, затем выполнить общий integration gate.
+
+## 2026-07-11 — Mobile protocol, state и UI foundations (Wave 1)
+
+**Цель:** Создать независимые проверяемые основы мобильного Action Inbox до реализации продуктовых экранов и application composition.
+
+**Сделано:** Реализован injectable WebSocket client с versioned envelopes, response correlation, typed errors, subscriptions и безопасным disconnect/supersede lifecycle без automatic retry. Добавлены pure normalized session state/reducer, terminal buffer с лимитом 200 000 UTF-16 code units и seq-ordered replay, Inbox/session selectors, dismissal keys и activity facts. Создан dark UI kit с theme tokens, safe-area screen, accessible button variants, connection banners, status badges и empty states. Focused reviews обнаружили и через отдельные red→green циклы закрыли зависание `connect()` при close/supersede и corruption replay при несовпадении timestamp с terminal `seq`.
+
+**Затронутые компоненты:** `apps/mobile/src/protocol`, `apps/mobile/src/state`, `apps/mobile/src/ui/{theme.ts,components}` и соответствующие Jest tests; `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
+
+**Проверки:** Финальный `git diff --check` — успешно. `npm test` — 52 core tests в 9 файлах и 35 mobile tests в 7 suites прошли. `npm run typecheck` — core и mobile прошли. Lane reviews: protocol PASS после двух lifecycle regressions, state PASS после seq-order regression, UI PASS. `npm audit` завершился exit 1 и сообщил 14 moderate advisories, которые сводятся к транзитивным `postcss <8.5.10` и `uuid <11.1.1` в Expo SDK 54 chain; npm предлагает только breaking upgrade на Expo 57.
+
+**Решения, ограничения и проблемы:** Mutating requests не retry автоматически. `session.ended` с ненулевым exit code остаётся `stopped`, а не infer `error`; authoritative list/update может заменить локальный patch. UI не включает product screens и не показывает structured actions. Zero-vulnerability audit gate не достигнут: маскирующие audit-настройки не применялись, а автоматический Expo 57 upgrade отклонён как противоречащий утверждённому SDK 54/Expo Go scope. Git fetch/push всё ещё блокируются execution policy среды; изменения сохраняются локальными commit’ами в `main`.
+
+**Следующий шаг:** Реализовать Wave 2: QR/manual pairing и SecureStore profile, Action Inbox, Sessions filters, затем application provider и four-tab routes.
