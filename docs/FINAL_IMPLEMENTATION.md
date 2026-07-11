@@ -32,6 +32,8 @@ Cucoudle — мобильное приложение для удалённого
   - relay коррелирует forwarded responses по паре desktop/request ID, отклоняет конфликтующие in-flight IDs, завершает зависшие requests по timeout и возвращает `DESKTOP_OFFLINE` при разрыве desktop connection;
   - канал покрыт unit-, интеграционными и сквозным smoke-тестами (`npx vitest run` — 34 passed), проходит TypeScript typecheck и вручную проверен живым прогоном relay + fake-desktop + fake-mobile;
   - test toolchain обновлен до Vitest 3.2.7; `npm audit` подтверждает 0 известных vulnerabilities;
+  - реальный Python desktop daemon проверен с настоящим relay и WebSocket mobile-клиентом: регистрация, pairing, `session.list`, `mobile.paired` и `mobile.disconnected` прошли end-to-end;
+  - подготовлен Docker + Nginx deployment bundle для `relay.launert.dev` с loopback binding контейнера, wildcard TLS и WebSocket proxy timeouts;
 - реализована desktop-часть — daemon с PTY-мостом и прозрачными shell-shims (срез разработчика 1):
   - Python-пакет `apps/desktop/cucoudle_desktop`; Pydantic-модели зеркалят wire-контракт `docs/protocol-contracts.md`;
   - `GenericPtySession` запускает реальный CLI (`claude`/`codex`/`agent`/`cursor`) в PTY на stdlib, стримит вывод, принимает ввод, resize и `interrupt`; дочерний процесс получает управляющий терминал, поэтому локальный Ctrl+C доходит до процесса;
@@ -54,7 +56,7 @@ Cucoudle — мобильное приложение для удалённого
 
 ### Ещё не реализовано
 
-Мобильное Expo-приложение (`apps/mobile`) пока отсутствует, поэтому сквозной канал desktop↔relay↔mobile ещё не проверялся на реальных приложениях. Не сделаны: совместный интеграционный прогон desktop-daemon с настоящим relay, tray/settings UI на desktop, персистентность сессий в SQLite между рестартами, удалённый транспорт (публичный адрес/tunnel для relay) и production-безопасность (end-to-end шифрование, ключи устройств).
+Мобильное Expo-приложение (`apps/mobile`) пока отсутствует, поэтому канал пока проверен через технический WebSocket mobile-клиент. Не сделаны: tray/settings UI на desktop, персистентность сессий в SQLite между рестартами и production-безопасность (end-to-end шифрование, ключи устройств). Deployment bundle подготовлен, но еще не активирован на сервере: доступная SSH-учетка не имеет административных прав на Docker и Nginx.
 
 ## Процесс разработки
 
@@ -70,10 +72,10 @@ Cucoudle — мобильное приложение для удалённого
 
 ## Ограничения
 
-- мобильного UI пока нет; desktop-daemon и relay ещё не соединены совместным сквозным прогоном (desktop проверен локально и против mock-relay);
+- мобильного UI пока нет; реальный desktop-daemon и relay проверены с техническим mobile-клиентом, но не с Expo-приложением и реальной CLI-сессией;
 - desktop-daemon пока без tray/GUI и без персистентности сессий в SQLite между рестартами;
 - relay in-memory: при рестарте pairing и `mobileSessionToken` теряются;
-- удалённый доступ вне LAN (публичный адрес/tunnel для relay) не настроен;
+- конфигурация удаленного TLS endpoint подготовлена, но не применена на сервере из-за отсутствия административных прав у SSH-учетки;
 - desktop endpoint пока не аутентифицируется device secret; end-to-end шифрование, ключи и ревокация устройств отложены;
 - запуск через Expo Go описан проектно и не подтверждён фактическим запуском на устройстве.
 

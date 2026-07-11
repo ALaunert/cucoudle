@@ -141,3 +141,17 @@
 - Пока не сделано: tray/GUI (PySide6), персистентность сессий в SQLite между рестартами, полноценные `mobile.resume` и точный `terminal.resize`.
 
 **Следующий шаг:** Интеграция с настоящим relay Разработчика 3 — сквозной pairing и управление сессией с fake-mobile, затем с реальным приложением; далее tray/settings UI и персистентность сессий в SQLite.
+
+## 2026-07-11 — Реальный desktop/relay smoke и deployment bundle
+
+**Цель:** Проверить совместимость независимо разработанных desktop и relay и подготовить воспроизводимое удаленное развертывание.
+
+**Сделано:** Локально запущены настоящий TypeScript relay и настоящий Python desktop daemon. Desktop зарегистрировался, запросил pairing code, технический mobile WebSocket-клиент выполнил `mobile.pair` и `session.list`; desktop получил presence-события подключения и отключения. Добавлены `Dockerfile.relay`, hardened compose service и Nginx virtual host для `relay.launert.dev` с существующим wildcard certificate.
+
+**Затронутые компоненты:** `.dockerignore`, `Dockerfile.relay`, `deploy/relay/*`, README и актуальное описание реализации. Desktop source code не менялся.
+
+**Проверки:** Реальный desktop→relay→mobile smoke — успешно; `docker compose config` — успешно; `npm test` — 34 passed; `npm run typecheck` — успешно; `npm audit` — 0 vulnerabilities. Локальная Docker image не собрана, потому что Docker daemon на development Mac не запущен.
+
+**Решения, ограничения и проблемы:** Контейнер публикует relay только на `127.0.0.1:8787`, наружу WebSocket отдает Nginx по TLS. На целевом сервере Node отсутствует, Docker и Nginx доступны только администратору, а выданная SSH-учетка не состоит в sudoers и не имеет доступа к Docker socket. Поэтому deployment не активирован и требует административного запуска описанных команд.
+
+**Следующий шаг:** Администратору применить `deploy/relay/README.md`, после чего проверить `https://relay.launert.dev/healthz` и провести тот же pairing smoke через `wss://relay.launert.dev`.
