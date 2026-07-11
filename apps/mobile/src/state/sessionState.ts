@@ -2,7 +2,9 @@ import type {
   EventMessage,
   InteractionRequest,
   Session,
+  TerminalRenderSnapshot,
 } from "@cucoudle/protocol";
+import type { RenderBuffer } from "./renderBuffer";
 import type { TerminalBuffer } from "./terminalBuffer";
 
 export type ActivityFactType = "created" | "updated" | "ended" | "removed";
@@ -24,12 +26,14 @@ export interface SessionSubscribeResult {
   terminalBuffer?: string;
   lastSeq?: number;
   activeInteraction?: InteractionRequest;
+  terminalRender?: TerminalRenderSnapshot;
 }
 
 export interface SessionState {
   sessionsById: Record<string, Session>;
   sessionIds: string[];
   terminalBySessionId: Record<string, TerminalBuffer>;
+  renderBySessionId: Record<string, RenderBuffer>;
   activeInteractionsBySessionId: Record<string, InteractionRequest>;
   dismissedAttentionKeys: Record<string, true>;
   activity: ActivityFact[];
@@ -50,6 +54,7 @@ export function createInitialSessionState(): SessionState {
     sessionsById: {},
     sessionIds: [],
     terminalBySessionId: {},
+    renderBySessionId: {},
     activeInteractionsBySessionId: {},
     dismissedAttentionKeys: {},
     activity: [],

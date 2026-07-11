@@ -2,6 +2,7 @@ import type {
   EventMessage,
   InteractionRequest,
   Session,
+  StyledLine,
   TerminalOutput,
 } from "@cucoudle/protocol";
 import {
@@ -9,6 +10,11 @@ import {
   type SessionAction,
   type SessionState,
 } from "./sessionState";
+import {
+  applyRenderFrame,
+  createRenderBuffer,
+  replaceRenderSnapshot,
+} from "./renderBuffer";
 import {
   appendTerminalOutput,
   createTerminalBuffer,
@@ -137,6 +143,29 @@ function receiveEvent(state: SessionState, event: EventMessage): SessionState {
     };
   }
 
+  if (event.event === "terminal.render") {
+    const { sessionId, seq, historyAppend, screen } = event.data;
+    if (
+      typeof sessionId !== "string" ||
+      typeof seq !== "number" ||
+      !Array.isArray(historyAppend) ||
+      !Array.isArray(screen)
+    ) {
+      return state;
+    }
+    const current = state.renderBySessionId[sessionId] ?? createRenderBuffer();
+    const next = applyRenderFrame(current, {
+      seq,
+      historyAppend: historyAppend as StyledLine[],
+      screen: screen as StyledLine[],
+    });
+    if (next === current) return state;
+    return {
+      ...state,
+      renderBySessionId: { ...state.renderBySessionId, [sessionId]: next },
+    };
+  }
+
   if (event.event === "interaction.requested" || event.event === "interaction.updated") {
     const interaction = eventInteraction(event);
     if (!interaction) return state;
@@ -192,6 +221,7 @@ function receiveEvent(state: SessionState, event: EventMessage): SessionState {
       sessionsById: omitKey(state.sessionsById, sessionId),
       sessionIds: state.sessionIds.filter((id) => id !== sessionId),
       terminalBySessionId: omitKey(state.terminalBySessionId, sessionId),
+      renderBySessionId: omitKey(state.renderBySessionId, sessionId),
       activeInteractionsBySessionId: omitKey(
         state.activeInteractionsBySessionId,
         sessionId,
@@ -251,6 +281,16 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
 
     if (result.mode === "replay") {
       next = orderReplayEvents(result.events ?? []).reduce(receiveEvent, next);
+    }
+
+    if (result.terminalRender) {
+      next = {
+        ...next,
+        renderBySessionId: {
+          ...next.renderBySessionId,
+          [result.session.id]: replaceRenderSnapshot(result.terminalRender),
+        },
+      };
     }
 
     return next;

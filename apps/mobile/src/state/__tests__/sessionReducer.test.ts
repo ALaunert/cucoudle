@@ -235,4 +235,60 @@ describe("sessionReducer", () => {
     expect(state.openSessionId).toBeUndefined();
     expect(state.subscribedSessionId).toBeUndefined();
   });
+
+  it("accumulates terminal.render frames and clears them on session.removed", () => {
+    let state = sessionReducer(createInitialSessionState(), {
+      type: "event/received",
+      event: event("session.created", { session: session("s1") }, "2026-07-11T10:00:00.000Z"),
+    });
+    state = sessionReducer(state, {
+      type: "event/received",
+      event: event(
+        "terminal.render",
+        { sessionId: "s1", seq: 1, historyAppend: [[{ t: "old" }]], screen: [[{ t: "live" }]] },
+        "2026-07-11T10:01:00.000Z",
+      ),
+    });
+    state = sessionReducer(state, {
+      type: "event/received",
+      event: event(
+        "terminal.render",
+        { sessionId: "s1", seq: 2, historyAppend: [], screen: [[{ t: "live 2", fg: "red" }]] },
+        "2026-07-11T10:02:00.000Z",
+      ),
+    });
+
+    expect(state.renderBySessionId.s1.history).toEqual([[{ t: "old" }]]);
+    expect(state.renderBySessionId.s1.screen).toEqual([[{ t: "live 2", fg: "red" }]]);
+    expect(state.renderBySessionId.s1.lastSeq).toBe(2);
+
+    state = sessionReducer(state, {
+      type: "event/received",
+      event: event("session.removed", { sessionId: "s1" }, "2026-07-11T10:05:00.000Z"),
+    });
+    expect(state.renderBySessionId.s1).toBeUndefined();
+  });
+
+  it("hydrates render state from a subscribe snapshot", () => {
+    const result: SessionSubscribeResult = {
+      session: session("s1"),
+      mode: "snapshot",
+      terminalBuffer: "raw",
+      lastSeq: 10,
+      terminalRender: {
+        history: [[{ t: "history line" }]],
+        screen: [[{ t: "screen line", b: true }]],
+        lastSeq: 4,
+      },
+    };
+    const state = sessionReducer(createInitialSessionState(), {
+      type: "session/subscribeReceived",
+      result,
+    });
+    expect(state.renderBySessionId.s1).toEqual({
+      history: [[{ t: "history line" }]],
+      screen: [[{ t: "screen line", b: true }]],
+      lastSeq: 4,
+    });
+  });
 });
