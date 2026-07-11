@@ -40,6 +40,7 @@ Cucoudle — мобильное приложение для удалённого
   - shim'ы — самодостаточные stdlib-программы; при недоступности демона, не-tty или вложенной управляемой сессии прозрачно `exec`'ят реальный бинарь (fallback обязателен);
   - установщик обнаруживает реальные бинари (исключая каталог shim'ов), генерирует shim'ы и идемпотентно правит shell-rc маркированным PATH-блоком с бэкапом (`install`/`uninstall`/`doctor`);
   - демон — источник правды по сессиям: Unix-сокет-мост локального терминала + control-канал, единый монотонный `seq`, буфер вывода и `session.subscribe` в режимах `live`/`replay`/`snapshot`, relay-клиент с `desktop.register`/`desktop.pairing.create` и обработкой форварднутых mobile-запросов и событий;
+  - production relay URL встроен в desktop как `wss://relay.launert.dev`; пользователь не вводит адрес, старый localhost-default мигрирует автоматически, а локальная разработка использует только environment override;
   - покрыто 38 тестами (`pytest`) и живым прогоном: реальный shim под PTY ↔ демон ↔ управляемый `/bin/cat`, зеркалирование ввода/вывода, live-листинг сессии и завершение по Ctrl+C; relay-клиент проверен против mock-relay.
 
 ## Архитектура и технологический стек
@@ -100,3 +101,4 @@ Cucoudle — мобильное приложение для удалённого
 3. Составить план и реализовать утверждённый Expo UI `Action Inbox`: pairing, четыре вкладки, status-derived inbox, список сессий, детальный экран с простым терминальным выводом, composer, interrupt и reconnect поверх baseline `@cucoudle/protocol`.
 4. После реализации capability negotiation включить в том же UI terminal keyboard, Approve/Reject, choices и text response с обязательным raw fallback; повторить полный E2E.
 5. Проверить настоящие Claude/Codex/Cursor prompts на macOS/Linux и iOS/Android.
+6. Добавить автоматическое desktop device enrollment и хранение credential в Keychain/Secret Service без пользовательской настройки.

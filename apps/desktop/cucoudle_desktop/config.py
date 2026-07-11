@@ -23,7 +23,8 @@ from pathlib import Path
 
 from . import APP_VERSION
 
-DEFAULT_RELAY_URL = "ws://localhost:8787"
+DEFAULT_RELAY_URL = "wss://relay.launert.dev"
+LEGACY_LOCAL_RELAY_URL = "ws://localhost:8787"
 
 # Tools we know how to shim. ``agent`` is the common Cursor CLI wrapper name.
 SUPPORTED_TOOLS = ("claude", "codex", "agent", "cursor")
@@ -93,12 +94,16 @@ class Config:
 
     @classmethod
     def from_dict(cls, data: dict, home: Path) -> "Config":
+        persisted_relay_url = data.get("relayUrl", DEFAULT_RELAY_URL)
+        relay_url = os.environ.get("CUCOUDLE_RELAY_URL") or persisted_relay_url
+        if relay_url == LEGACY_LOCAL_RELAY_URL and "CUCOUDLE_RELAY_URL" not in os.environ:
+            relay_url = DEFAULT_RELAY_URL
         return cls(
             desktop_id=data["desktopId"],
             desktop_name=data.get("desktopName", socket.gethostname()),
             platform=data.get("platform", _detect_platform()),
             app_version=data.get("appVersion", APP_VERSION),
-            relay_url=data.get("relayUrl", DEFAULT_RELAY_URL),
+            relay_url=relay_url,
             real_binaries=dict(data.get("realBinaries", {})),
             home=home,
         )
@@ -142,4 +147,8 @@ def load_or_create_config(home: Path | None = None) -> Config:
     if cfg is None:
         cfg = default_config(home)
         cfg.save()
+    elif "CUCOUDLE_RELAY_URL" not in os.environ:
+        data = json.loads(cfg.config_path.read_text(encoding="utf-8"))
+        if data.get("relayUrl") == LEGACY_LOCAL_RELAY_URL:
+            cfg.save()
     return cfg

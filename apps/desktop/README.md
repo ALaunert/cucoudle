@@ -49,8 +49,12 @@ cucoudle status      # daemon / relay / paired-devices / sessions
 cucoudle sessions    # list managed sessions
 ```
 
-`CUCOUDLE_HOME` overrides `~/.cucoudle`; `CUCOUDLE_RELAY_URL` overrides the relay
-URL (default `ws://localhost:8787`).
+`CUCOUDLE_HOME` overrides `~/.cucoudle`. Production builds connect to
+`wss://relay.launert.dev` by default; the daemon appends `/v1/ws/desktop`.
+`CUCOUDLE_RELAY_URL` overrides this base URL, for example
+`ws://localhost:8787` for local relay development. Existing configs containing
+the old localhost default are migrated automatically; custom relay URLs are
+preserved.
 
 ## Local demo (no relay needed)
 

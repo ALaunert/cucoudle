@@ -238,3 +238,17 @@
 **Решения, ограничения и проблемы:** `waiting` может отсутствовать без desktop-side detection, поэтому mobile не парсит сырой терминал для определения запросов. Structured permission actions описаны target-контрактом, но останутся скрыты до end-to-end реализации capability negotiation; запуск сессии с телефона, multi-desktop, push, семантическая лента и rich terminal rendering отложены. Мобильное приложение пока не реализовано.
 
 **Следующий шаг:** Получить финальное подтверждение записанной спецификации и перейти к подробному плану реализации Expo-приложения.
+
+## 2026-07-11 — Zero-config production relay endpoint в desktop
+
+**Цель:** Убрать ручную настройку адреса сервера при установке desktop-приложения.
+
+**Сделано:** Desktop default изменен с локального `ws://localhost:8787` на production base URL `wss://relay.launert.dev`; relay client автоматически добавляет `/v1/ws/desktop`. Добавлена автоматическая миграция существующего legacy localhost-default при загрузке config. Пользовательские custom URLs сохраняются, а `CUCOUDLE_RELAY_URL` остается явным developer override и не требует изменения файлов.
+
+**Затронутые компоненты:** `apps/desktop/cucoudle_desktop/config.py`, отдельные config tests, desktop README и актуальная документация. Параллельные изменения installer/CLI/shim другого desktop-агента не включены в этот инкремент.
+
+**Проверки:** Desktop test suite — 47 passed, включая 4 новых config tests: production default, environment override, legacy migration и сохранение custom URL.
+
+**Решения, ограничения и проблемы:** SSH login/password не являются runtime credentials и не помещаются в приложение. Desktop знает публичный WSS endpoint без действий пользователя. Отдельная desktop device-secret authentication пока не реализована; она должна генерироваться/получаться автоматически и храниться в Keychain/Secret Service, а не запрашиваться у пользователя. Сам endpoint станет доступен только после административного применения подготовленного deployment bundle на сервере.
+
+**Следующий шаг:** Backend owner реализует автоматическое device enrollment/credential storage без ручного ввода, затем администратор активирует `relay.launert.dev` за Nginx TLS.
