@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 
 import { StyledTerminal, terminalRows } from "../StyledTerminal";
 import { ansiColor, TERMINAL_DEFAULT_FG } from "../ansiPalette";
@@ -28,6 +28,7 @@ describe("terminalRows", () => {
       lastSeq: 1,
     });
     expect(rows.map((r) => r.key)).toEqual(["s0", "s1", "s2"]);
+    expect(rows.map((r) => r.kind)).toEqual(["text", "blank", "text"]);
   });
 });
 
@@ -52,5 +53,29 @@ describe("StyledTerminal", () => {
     expect(view.getByTestId("styled-terminal").props.style).toEqual(
       expect.objectContaining({ minHeight: 0 }),
     );
+  });
+
+  it("offers a compact return-to-live-tail control after scrolling up", () => {
+    const view = render(<StyledTerminal buffer={buffer} />);
+    const list = view.getByTestId("styled-terminal-list");
+    fireEvent.scroll(list, {
+      nativeEvent: {
+        contentOffset: { y: 0 },
+        contentSize: { height: 1000 },
+        layoutMeasurement: { height: 300 },
+      },
+    });
+    expect(view.getByRole("button", { name: "К последнему выводу" })).toBeTruthy();
+    fireEvent.press(view.getByTestId("terminal-live-tail"));
+    expect(view.queryByTestId("terminal-live-tail")).toBeNull();
+  });
+
+  it("switches to an exact horizontally scrollable grid", () => {
+    const view = render(<StyledTerminal buffer={buffer} />);
+    fireEvent.press(view.getByRole("tab", { name: "1:1" }));
+    expect(view.getByTestId("terminal-grid-scroll")).toBeTruthy();
+    expect(view.getByRole("tab", { name: "1:1" }).props.accessibilityState).toEqual({
+      selected: true,
+    });
   });
 });

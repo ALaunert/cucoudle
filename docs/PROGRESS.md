@@ -790,3 +790,17 @@
 **Решения, ограничения и проблемы:** Наблюдаемое пользователем «проглатывание» имело две причины: (1) тестирование шло против dev-daemon, запущенного до фикса 911375a; (2) новый путь ответа на interaction-карточку содержал ту же ошибку. Homebrew 0.1.5 (запущен 15:43) уже содержит фикс `session.input`, но не содержит фикс `interaction.respond` — для него нужен новый релиз или запуск daemon из исходников.
 
 **Следующий шаг:** Перепроверить с телефона против текущего daemon оба пути ввода (composer сессии и текстовый ответ на карточку) и при подтверждении выпустить обновление Homebrew.
+
+## 2026-07-11 — Readable и exact-режимы mobile terminal
+
+**Цель:** Сделать сырой TUI-вывод Claude/Codex читаемым на узком экране, не теряя точную terminal grid и ANSI-стили.
+
+**Сделано:** Добавлен mobile presentation parser для styled lines. Режим `Читать` удаляет invisible/control chars, нормализует NBSP/tabs, компактирует большие positional gaps, сливает соседние runs с одинаковым стилем, схлопывает blank rows и рендерит длинные TUI-разделители как линии. Сегмент `1:1` возвращает исходные runs/пробелы в единой горизонтально скроллируемой grid. При ручной прокрутке вверх появляется компактная кнопка `↓` для возврата к live tail; при follow-mode новые кадры по-прежнему прокручиваются автоматически.
+
+**Затронутые компоненты:** `apps/mobile/src/features/session/{StyledTerminal.tsx,terminalPresentation.ts,__tests__/StyledTerminal.test.tsx,__tests__/terminalPresentation.test.ts}`, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`; desktop, relay и wire-контракт не менялись.
+
+**Проверки:** Mobile TypeScript typecheck — успешно; focused terminal suites — 11/11; полный mobile Jest — 27 suites, 178/178 tests; `git diff --check` — успешно. Известные Expo Router warnings о лишних mock routes `new`/`settings` остались, на результат не влияют.
+
+**Решения, ограничения и проблемы:** Readable mode намеренно может менять большие пробельные отступы для рефлоу; поэтому `1:1` всегда доступен как lossless-представление. Оба режима сохраняют text selection и ANSI цвет/bold/italic/underline. Физический iOS/Android smoke и тюнинг ширины/типографики ещё нужны.
+
+**Следующий шаг:** Прогнать на iPhone живые Claude/Codex сессии, сравнить `Читать` и `1:1` на code blocks, tables, approval prompts и spinner redraw, затем докрутить spacing/palette по device-снимкам.
