@@ -66,9 +66,10 @@ export function AttentionCard({
   };
 
   return (
-    <View
+    <Pressable
       accessibilityLabel={`${content.message}. ${session.title}`}
-      style={styles.card}
+      onPress={handlePrimaryAction}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       testID={`attention-card-${session.id}`}
     >
       <View style={styles.heading}>
@@ -101,7 +102,7 @@ export function AttentionCard({
       ) : (
         <AppButton label={content.action} onPress={handlePrimaryAction} />
       )}
-    </View>
+    </Pressable>
   );
 }
 
@@ -114,6 +115,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.md,
   },
+  cardPressed: { backgroundColor: colors.surfaceRaised },
   heading: {
     flexDirection: "row",
     alignItems: "flex-start",

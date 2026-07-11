@@ -1,5 +1,5 @@
 import type { Session } from "@cucoudle/protocol";
-import { render, screen, within } from "@testing-library/react-native";
+import { fireEvent, render, screen, within } from "@testing-library/react-native";
 
 import { createInitialSessionState, type ActivityFact } from "../../../state/sessionState";
 import { InboxScreen } from "../InboxScreen";
@@ -79,6 +79,45 @@ test("derives attention and recent activity from selector-ready state", () => {
 
   expect(screen.getByText("1 требует внимания")).toBeVisible();
   expect(screen.getByText("Background task")).toBeVisible();
+});
+
+test("opens the session when an activity row is tapped", () => {
+  const onViewSession = jest.fn();
+
+  render(
+    <InboxScreen
+      {...callbacks}
+      attentionCards={[]}
+      connectionStatus="connected"
+      onViewSession={onViewSession}
+      recentActivity={[activity]}
+    />,
+  );
+
+  fireEvent.press(screen.getByTestId(`activity-${activity.id}`));
+  expect(onViewSession).toHaveBeenCalledWith(activity.sessionId);
+});
+
+test("keeps removed-session activity rows non-interactive", () => {
+  const onViewSession = jest.fn();
+  const removed: ActivityFact = {
+    ...activity,
+    id: "activity-removed",
+    type: "removed",
+  };
+
+  render(
+    <InboxScreen
+      {...callbacks}
+      attentionCards={[]}
+      connectionStatus="connected"
+      onViewSession={onViewSession}
+      recentActivity={[removed]}
+    />,
+  );
+
+  fireEvent.press(screen.getByTestId(`activity-${removed.id}`));
+  expect(onViewSession).not.toHaveBeenCalled();
 });
 
 test("shows a connected empty state when there is no attention or activity", () => {

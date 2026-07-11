@@ -111,7 +111,13 @@ export function InboxScreen({
               Последняя активность
             </Text>
             {activity.map((item) => (
-              <ActivityRow activity={item} key={item.id} />
+              <ActivityRow
+                activity={item}
+                key={item.id}
+                {...(item.type === "removed"
+                  ? {}
+                  : { onPress: () => onViewSession(item.sessionId) })}
+              />
             ))}
           </View>
         ) : null}

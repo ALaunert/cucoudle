@@ -60,8 +60,43 @@ test.each([
   expect(onView).toHaveBeenCalledWith(item.id);
 });
 
+test("opens a waiting session when the card body is tapped", () => {
+  const onOpen = jest.fn();
+  const item = session("waiting");
+
+  render(
+    <AttentionCard
+      session={item}
+      onDismiss={jest.fn()}
+      onOpen={onOpen}
+      onView={jest.fn()}
+    />,
+  );
+
+  fireEvent.press(screen.getByTestId(`attention-card-${item.id}`));
+  expect(onOpen).toHaveBeenCalledWith(item.id);
+});
+
+test("views a terminal session when the card body is tapped", () => {
+  const onView = jest.fn();
+  const item = session("error", 1);
+
+  render(
+    <AttentionCard
+      session={item}
+      onDismiss={jest.fn()}
+      onOpen={jest.fn()}
+      onView={onView}
+    />,
+  );
+
+  fireEvent.press(screen.getByTestId(`attention-card-${item.id}`));
+  expect(onView).toHaveBeenCalledWith(item.id);
+});
+
 test("dismisses only the exact visible attention version", () => {
   const onDismiss = jest.fn();
+  const onView = jest.fn();
   const item = session("error", 17);
 
   render(
@@ -69,10 +104,11 @@ test("dismisses only the exact visible attention version", () => {
       session={item}
       onDismiss={onDismiss}
       onOpen={jest.fn()}
-      onView={jest.fn()}
+      onView={onView}
     />,
   );
 
   fireEvent.press(screen.getByRole("button", { name: "Скрыть уведомление" }));
   expect(onDismiss).toHaveBeenCalledWith(makeDismissalKey(item));
+  expect(onView).not.toHaveBeenCalled();
 });
