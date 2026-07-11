@@ -105,3 +105,39 @@
 **Решения, ограничения и проблемы:** Wire request ID не переписывается, поэтому relay разрешает только один одинаковый in-flight ID в рамках desktop. Timeout возвращает `INTERNAL_ERROR`, так как отдельного protocol error code для timeout пока нет. Pairing, resume tokens и routing state остаются in-memory; desktop device-secret authentication еще не реализована.
 
 **Следующий шаг:** Проверить реальный Python desktop client против relay, затем развернуть relay за TLS на выделенном сервере с process supervisor и закрытым firewall.
+
+## 2026-07-11 — Desktop daemon: PTY-мост, shim'ы и relay-клиент (разработчик 1)
+
+**Цель:** Реализовать desktop-часть MVP: прозрачный запуск CLI-агентов в управляемом PTY, локальный мост терминала, установщик shell-интеграции и клиент relay — строго по контрактам `docs/protocol-contracts.md`.
+
+**Сделано:**
+
+- Создан Python-пакет `apps/desktop/cucoudle_desktop` (Python 3.11+, зависимости `pydantic`, `websockets`, `qrcode`).
+- `protocol.py` — Pydantic-модели, зеркалящие wire-контракт: версионированный конверт request/response/event, `Session`, `ErrorCode`, хелперы сборки/парсинга.
+- `session.py` — `GenericPtySession` на stdlib: запуск реального бинаря в PTY, стриминг вывода через `asyncio`, ввод, resize, `interrupt` (SIGINT по группе), захват кода выхода; дочерний процесс получает управляющий терминал (`setsid` + `TIOCSCTTY`), поэтому локальный Ctrl+C доходит до процесса.
+- `registry.py` — реестр сессий: единый монотонный `seq` на демон, ограниченный буфер вывода, ответ `session.subscribe` в режимах `live`/`replay`/`snapshot`.
+- `ipc.py` — length-prefixed фреймы поверх Unix-сокета для канала shim/CLI ↔ демон (сырые байты терминала + управляющие JSON-фреймы).
+- `shim_template.py` — самодостаточные stdlib-shim'ы; при недоступности демона, не-tty или уже управляемой сессии — прозрачный `exec` реального бинаря.
+- `installer.py` — обнаружение реальных бинарей (исключая каталог shim'ов), генерация shim'ов, идемпотентная правка shell-rc с маркированным блоком и бэкапом, `install`/`uninstall`/`doctor`.
+- `daemon.py` — Unix-сокет-сервер (мост терминала + control-канал) и связка реестра с relay-клиентом: фан-аут вывода PTY в локальный терминал, буфер и relay; обработка форварднутых mobile-запросов (`session.list`/`subscribe`/`input`/`interrupt`/`terminal.resize`) и событий (`session.created`/`updated`/`ended`, `terminal.output`).
+- `relay_client.py` — подключение с backoff, `desktop.register`, `desktop.pairing.create`, корреляция request/response, диспетчеризация форварднутых mobile-запросов, обработка `mobile.paired`/`mobile.disconnected`.
+- `cli.py` — команды `daemon`, `install`, `uninstall`, `doctor`, `pair` (QR в терминале), `status`, `sessions`.
+- README десктопа и Python-игноры в `.gitignore`.
+
+**Затронутые компоненты:** новый каталог `apps/desktop/` (пакет `cucoudle_desktop`, тесты, `pyproject.toml`, `README.md`), `.gitignore`, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
+
+**Проверки:**
+
+- `pytest` — 38 тестов зелёные (протокол, IPC-фреймы, установщик, реестр replay/snapshot, PTY-сессия, e2e-мост shim↔демон↔PTY, relay-клиент против mock-relay).
+- Живой прогон: реальный сгенерированный shim под настоящим PTY против запущенного демона — ввод «hello-from-terminal» зеркалится к управляемому `/bin/cat` и возвращается; `cucoudle sessions`/`status` показывают живую сессию; Ctrl+C (`\x03`) завершает сессию (exit=-2); обрыв relay не роняет демон.
+- `cucoudle doctor` на изолированном `HOME` находит реальные `claude`/`codex`; `cucoudle pair` без демона выдаёт понятную ошибку.
+
+**Решения, ограничения и проблемы:**
+
+- Локальный канал shim↔демон — Unix-сокет с собственным фреймингом (не WebSocket): быстрый старт shim'а и чистый байтовый мост терминала.
+- PTY реализован на stdlib (`os.openpty` + `subprocess` + `fcntl`/`termios`) — без нативных зависимостей.
+- Демон владеет master-стороной PTY: отключение shim'а (закрытие терминала) не убивает сессию — ею можно управлять с телефона.
+- Relay проверен через mock-relay; совместный прогон с настоящим relay Разработчика 3 ещё впереди.
+- Пока не сделано: tray/GUI (PySide6), персистентность сессий в SQLite между рестартами, полноценные `mobile.resume` и точный `terminal.resize`.
+
+**Следующий шаг:** Интеграция с настоящим relay Разработчика 3 — сквозной pairing и управление сессией с fake-mobile, затем с реальным приложением; далее tray/settings UI и персистентность сессий в SQLite.

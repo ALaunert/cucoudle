@@ -1,0 +1,30 @@
+[project]
+name = "cucoudle-desktop"
+version = "0.1.0"
+description = "Cucoudle desktop daemon: managed PTY bridge and shell shims for remote CLI agent control"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.6",
+    "websockets>=12.0",
+    "qrcode>=7.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+cucoudle = "cucoudle_desktop.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["cucoudle_desktop"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

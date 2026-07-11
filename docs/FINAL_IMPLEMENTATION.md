@@ -31,7 +31,14 @@ Cucoudle — мобильное приложение для удалённого
   - `@cucoudle/relay` — Fastify + WebSocket брокер: pairing по коду/QR с выдачей `mobileSessionToken` и reconnect через `mobile.resume`, presence-события, прозрачный форвардинг mobile↔desktop с корреляцией по `id` и fan-out событий desktop→mobile, health-эндпоинты;
   - relay коррелирует forwarded responses по паре desktop/request ID, отклоняет конфликтующие in-flight IDs, завершает зависшие requests по timeout и возвращает `DESKTOP_OFFLINE` при разрыве desktop connection;
   - канал покрыт unit-, интеграционными и сквозным smoke-тестами (`npx vitest run` — 34 passed), проходит TypeScript typecheck и вручную проверен живым прогоном relay + fake-desktop + fake-mobile;
-  - test toolchain обновлен до Vitest 3.2.7; `npm audit` подтверждает 0 известных vulnerabilities.
+  - test toolchain обновлен до Vitest 3.2.7; `npm audit` подтверждает 0 известных vulnerabilities;
+- реализована desktop-часть — daemon с PTY-мостом и прозрачными shell-shims (срез разработчика 1):
+  - Python-пакет `apps/desktop/cucoudle_desktop`; Pydantic-модели зеркалят wire-контракт `docs/protocol-contracts.md`;
+  - `GenericPtySession` запускает реальный CLI (`claude`/`codex`/`agent`/`cursor`) в PTY на stdlib, стримит вывод, принимает ввод, resize и `interrupt`; дочерний процесс получает управляющий терминал, поэтому локальный Ctrl+C доходит до процесса;
+  - shim'ы — самодостаточные stdlib-программы; при недоступности демона, не-tty или вложенной управляемой сессии прозрачно `exec`'ят реальный бинарь (fallback обязателен);
+  - установщик обнаруживает реальные бинари (исключая каталог shim'ов), генерирует shim'ы и идемпотентно правит shell-rc маркированным PATH-блоком с бэкапом (`install`/`uninstall`/`doctor`);
+  - демон — источник правды по сессиям: Unix-сокет-мост локального терминала + control-канал, единый монотонный `seq`, буфер вывода и `session.subscribe` в режимах `live`/`replay`/`snapshot`, relay-клиент с `desktop.register`/`desktop.pairing.create` и обработкой форварднутых mobile-запросов и событий;
+  - покрыто 38 тестами (`pytest`) и живым прогоном: реальный shim под PTY ↔ демон ↔ управляемый `/bin/cat`, зеркалирование ввода/вывода, live-листинг сессии и завершение по Ctrl+C; relay-клиент проверен против mock-relay.
 
 ## Архитектура и технологический стек
 
@@ -47,7 +54,7 @@ Cucoudle — мобильное приложение для удалённого
 
 ### Ещё не реализовано
 
-Desktop-daemon с PTY-мостом и shell-shims (`apps/desktop`) и мобильное Expo-приложение (`apps/mobile`) пока отсутствуют в репозитории. Удалённый транспорт (публичный адрес/tunnel для relay) и production-безопасность (end-to-end шифрование, ключи устройств) ещё не настроены.
+Мобильное Expo-приложение (`apps/mobile`) пока отсутствует, поэтому сквозной канал desktop↔relay↔mobile ещё не проверялся на реальных приложениях. Не сделаны: совместный интеграционный прогон desktop-daemon с настоящим relay, tray/settings UI на desktop, персистентность сессий в SQLite между рестартами, удалённый транспорт (публичный адрес/tunnel для relay) и production-безопасность (end-to-end шифрование, ключи устройств).
 
 ## Процесс разработки
 
@@ -59,11 +66,12 @@ Desktop-daemon с PTY-мостом и shell-shims (`apps/desktop`) и мобил
 
 ## Текущее проверенное состояние
 
-Репозиторий содержит описание продукта, проектные спецификации, единый процесс документирования и рабочий канал десктоп↔мобила: shared-протокол `@cucoudle/protocol` и relay-брокер `@cucoudle/relay` с зелёным набором тестов. Desktop-daemon и мобильный UI пока не созданы, поэтому сквозной канал проверен на fake-desktop/fake-mobile харнессах, а не на реальных приложениях.
+Репозиторий содержит описание продукта, проектные спецификации, единый процесс документирования, рабочий канал десктоп↔мобила (`@cucoudle/protocol` + `@cucoudle/relay`) и desktop-daemon с PTY-мостом и shell-shims (`apps/desktop`). Обе части имеют зелёные наборы тестов. Мобильный UI пока не создан, а desktop-daemon и relay ещё не соединены совместным сквозным прогоном: desktop проверен локально и против mock-relay, relay — на fake-desktop/fake-mobile харнессах.
 
 ## Ограничения
 
-- нет desktop-daemon (PTY-мост, shell-shims) и мобильного UI — канал проверен только на fake-клиентах;
+- мобильного UI пока нет; desktop-daemon и relay ещё не соединены совместным сквозным прогоном (desktop проверен локально и против mock-relay);
+- desktop-daemon пока без tray/GUI и без персистентности сессий в SQLite между рестартами;
 - relay in-memory: при рестарте pairing и `mobileSessionToken` теряются;
 - удалённый доступ вне LAN (публичный адрес/tunnel для relay) не настроен;
 - desktop endpoint пока не аутентифицируется device secret; end-to-end шифрование, ключи и ревокация устройств отложены;
@@ -71,11 +79,11 @@ Desktop-daemon с PTY-мостом и shell-shims (`apps/desktop`) и мобил
 
 ## Демонстрационный сценарий
 
-Проверяемый сегодня сценарий: `npm run relay`, затем fake-desktop печатает pairing-код, fake-mobile пейрится по коду, получает список сессий, подписывается на сессию, видит стрим `terminal.output` и отправляет `session.input` обратно в desktop. Целевой продуктовый demo — то же самое с реальным desktop-daemon (команда `claude` через shim) и мобильным приложением на iPhone.
+Проверяемые сегодня сценарии: (1) на desktop — `cucoudle daemon`, затем привычная команда через shim (`claude`/`codex`/`bash`) стартует управляемую PTY-сессию, `cucoudle sessions`/`status` показывают её, ввод/вывод зеркалятся в терминал, локальный Ctrl+C завершает сессию; (2) на relay — `npm run relay`, fake-desktop печатает pairing-код, fake-mobile пейрится по коду, получает список сессий, подписывается на сессию, видит стрим `terminal.output` и отправляет `session.input` обратно в desktop. Целевой продуктовый demo — объединить их: реальный desktop-daemon (команда `claude` через shim) через relay и мобильное приложение на iPhone.
 
 ## Следующие шаги
 
-1. Разработчику 1 — реализовать desktop-daemon с PTY-сессиями и shell-shims, подключить его к relay по контрактам.
+1. Соединить desktop-daemon (разработчик 1) с настоящим relay (разработчик 3): проверить сквозной pairing и управление сессией сначала с fake-mobile, затем с реальным приложением.
 2. Разработчику 2 — реализовать Expo-приложение (pairing по QR, список сессий, детальный экран с терминалом, composer) поверх `@cucoudle/protocol`.
 3. Проверить канал на реальных desktop+mobile, затем на Android и Linux.
-4. При необходимости поднять публичный адрес/tunnel для relay для удалённого demo «не за рабочим компом».
+4. На desktop добавить tray/settings UI и персистентность сессий в SQLite; при необходимости поднять публичный адрес/tunnel для relay для удалённого demo «не за рабочим компом».

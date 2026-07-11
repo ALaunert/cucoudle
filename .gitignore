@@ -37,5 +37,17 @@ node_modules/
 dist/
 *.log
 
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.eggs/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
 # IDE
 .idea/
