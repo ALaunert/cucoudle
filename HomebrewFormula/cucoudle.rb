@@ -1,5 +1,7 @@
+# typed: strict
 # frozen_string_literal: true
 
+# Homebrew formula for the Cucoudle desktop daemon and transparent CLI shims.
 class Cucoudle < Formula
   include Language::Python::Virtualenv
 
