@@ -36,3 +36,6 @@ ai-artifacts/
 node_modules/
 dist/
 *.log
+
+# IDE
+.idea/
