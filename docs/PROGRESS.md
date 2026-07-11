@@ -363,3 +363,16 @@
 **Решения, ограничения и проблемы:** Relay остаётся в монорепозитории ради единого protocol contract, но является независимой deployable единицей. Nginx — одноразовая инфраструктурная настройка, обычные релизы выполняются без sudo. Workflow не содержит credentials: для активации production deploy нужно добавить dedicated SSH key в GitHub Environment и выставить `RELAY_DEPLOY_ENABLED=true`; GHCR использует short-lived workflow token. До активации текущий bootstrap container продолжает работать.
 
 **Следующий шаг:** Заполнить GitHub Environment secrets/variable, выполнить первый workflow deployment поверх bootstrap image и затем провести desktop daemon pairing smoke через публичный WSS.
+## 2026-07-11 — Expo scaffold и mobile test harness
+
+**Цель:** Создать физически совместимую с Expo Go основу мобильного приложения и включить её в общие тестовые и typecheck-команды монорепозитория.
+
+**Сделано:** Создан npm workspace `@cucoudle/mobile` на Expo SDK 54 с Expo Router и TypeScript; подключены `expo-camera`, `expo-secure-store`, `expo-crypto`, Jest/`jest-expo` и React Native Testing Library. Добавлены root-команды `mobile`, `mobile:tunnel`, `mobile:doctor`, раздельные core/mobile test и typecheck gates. Root Vitest и TypeScript исключают вложенный Expo-проект. Через TDD добавлены минимальный `BrandMark`, root Stack и временный index route.
+
+**Затронутые компоненты:** `apps/mobile/{package.json,app.json,tsconfig.json,jest.config.js,jest.setup.ts,expo-env.d.ts}`, `apps/mobile/src/app`, `apps/mobile/src/ui`, root `package.json`, `package-lock.json`, `tsconfig.base.json`, `vitest.config.ts`, `.gitignore`, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
+
+**Проверки:** `BrandMark.test.tsx` сначала завершился ожидаемым red из-за отсутствующего `BrandMark`, после минимальной реализации — green. Свежий `npm test` — 52 core tests в 9 файлах и 1 mobile test прошли; `npm run typecheck` — core и mobile прошли; `npm run mobile:doctor` — 18/18 проверок, проблем не обнаружено.
+
+**Решения, ограничения и проблемы:** Expo scaffold является только технической основой: pairing, mobile protocol client, session state и продуктовые экраны ещё не реализованы. После установки Expo SDK 54 `npm audit --json` сообщает 14 moderate advisories в транзитивной Expo dependency chain; npm предлагает только несовместимый переход на Expo 57, поэтому Task 1 не маскирует результат как zero-vulnerability, а следующему обязательному audit gate потребуется отдельное совместимое решение. Git remote fetch/pull был заблокирован политикой выполнения среды до запуска команды; локальная ветка при старте показывала `main...origin/main` без расхождения, tracked-изменений не было, а неизвестные `.superpowers/`, session prompt и `docs/SESSION_HANDOFF.md` не изменялись и не добавлялись.
+
+**Следующий шаг:** Параллельно реализовать Wave 1: request-correlated mobile protocol client, pure session state/selectors и approved dark UI kit, затем выполнить общий integration gate.

@@ -10,11 +10,18 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "vitest run",
+    "mobile": "npm run start -w @cucoudle/mobile",
+    "mobile:tunnel": "npm run start:tunnel -w @cucoudle/mobile",
+    "mobile:doctor": "npm run doctor -w @cucoudle/mobile",
+    "test:core": "vitest run",
+    "test:mobile": "npm test -w @cucoudle/mobile --",
+    "test": "npm run test:core && npm run test:mobile",
     "test:watch": "vitest",
     "relay": "npm run start -w @cucoudle/relay",
     "test:integration": "tsx tests/integration/desktop-relay-smoke.ts",
-    "typecheck": "tsc -p tsconfig.base.json --noEmit"
+    "typecheck:core": "tsc -p tsconfig.base.json --noEmit",
+    "typecheck:mobile": "npm run typecheck -w @cucoudle/mobile",
+    "typecheck": "npm run typecheck:core && npm run typecheck:mobile"
   },
   "devDependencies": {
     "@types/node": "^20.16.0",

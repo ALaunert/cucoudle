@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Cucoudle",
+    "slug": "cucoudle",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "cucoudle",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Разрешить Cucoudle сканировать QR-код подключения"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "autolinkingModuleResolution": true
+    }
+  }
+}

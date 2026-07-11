@@ -36,6 +36,7 @@ ai-artifacts/
 node_modules/
 dist/
 *.log
+.expo/
 
 # Python
 __pycache__/

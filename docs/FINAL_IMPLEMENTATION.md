@@ -24,6 +24,7 @@ Cucoudle — мобильное приложение для удалённого
 - определён tunnel-режим как резервный способ подключения устройства к Metro;
 - Codex и Claude Code получают общие командные правила через `AGENTS.md` и `CLAUDE.md`;
 - создан процесс накопления хронологии разработки и актуального описания продукта для презентации;
+- создан Expo SDK 54 workspace `@cucoudle/mobile` с Expo Router, TypeScript, Jest/`jest-expo`, React Native Testing Library и командами запуска/проверок из корня монорепозитория; минимальный `BrandMark` и root route покрыты первым mobile component test, а Expo doctor проходит 18/18 проверок;
 - зафиксирован CLI-first MVP: desktop-daemon с shell-shims запускает CLI-агентов в PTY, relay передаёт сырой терминальный вывод на мобилу (без Claude/Codex SDK на этом этапе);
 - реализован канал десктоп↔мобила — shared-протокол и relay-брокер (срез разработчика 3):
   - монорепо на npm workspaces с пакетами `@cucoudle/protocol` и `@cucoudle/relay`;
@@ -68,7 +69,7 @@ Cucoudle — мобильное приложение для удалённого
 
 ### Ещё не реализовано
 
-Мобильное Expo-приложение (`apps/mobile`) пока отсутствует, поэтому канал пока проверен через технический WebSocket mobile-клиент. Для mobile согласован подробный UI-дизайн `Action Inbox`, но код экранов, WebSocket-клиент и запуск на iPhone ещё не реализованы. Расширенные `session.input` modes (`bytes`, `keys`) и structured interactions реализованы на уровне протокола: shared Zod-схемы в `@cucoudle/protocol` и relay-allowlist готовы и покрыты тестами (relay форвардит `interaction.respond` и фанит `interaction.*`). Capability negotiation (offers/`negotiatedCapabilities`) пока только специфицирована и не реализована. Ещё не сделаны: Pydantic-зеркало и key/bytes mapping + provider-детекторы на desktop, mobile offer/controls, capability negotiation в relay/desktop/mobile, tray/settings UI, SQLite persistence и production security. Production relay доступен по `https://relay.launert.dev`/`wss://relay.launert.dev`; оба WSS route проверены реальным upgrade и protocol error response.
+Expo workspace и mobile test harness уже созданы, но продуктовые экраны `Action Inbox`, mobile WebSocket-клиент, pairing/persistence, session state и запуск на iPhone ещё не реализованы. Канал по-прежнему функционально проверен через технический WebSocket mobile-клиент. Расширенные `session.input` modes (`bytes`, `keys`) и structured interactions реализованы на уровне протокола: shared Zod-схемы в `@cucoudle/protocol` и relay-allowlist готовы и покрыты тестами (relay форвардит `interaction.respond` и фанит `interaction.*`). Capability negotiation (offers/`negotiatedCapabilities`) пока только специфицирована и не реализована. Ещё не сделаны: Pydantic-зеркало и key/bytes mapping + provider-детекторы на desktop, mobile offer/controls, capability negotiation в relay/desktop/mobile, tray/settings UI, SQLite persistence и production security. Production relay доступен по `https://relay.launert.dev`/`wss://relay.launert.dev`; оба WSS route проверены реальным upgrade и protocol error response. После добавления Expo SDK 54 актуальный `npm audit` сообщает 14 moderate advisories в Expo dependency chain; предлагаемое npm исправление переводит проект на несовместимый с выбранным Expo Go стеком Expo 57, поэтому audit gate следующей волны требует отдельного совместимого решения.
 
 ## Процесс разработки
 
@@ -82,17 +83,18 @@ Cucoudle — мобильное приложение для удалённого
 
 ## Текущее проверенное состояние
 
-Репозиторий содержит описание продукта, проектные спецификации, рабочий relay и desktop-daemon с PTY-мостом и shell-shims. Независимо разработанные desktop и relay соединены и проверены **воспроизводимым кросс-язык harness** (`npm run test:integration`, `tests/integration/desktop-relay-smoke.ts`): настоящий Python-демон против запущенного TS relay + mobile WebSocket-клиент проходят `register`/`pairing`/`session.list`/спаун сессии/`subscribe`/`session.input`→`terminal.output`. Это подтверждает совпадение контракта Zod↔Pydantic на живых сокетах. Мобильный Expo UI пока не создан, а настоящий Claude/Codex/Cursor в этом прогоне заменялся контролируемым `/bin/cat` за shim `claude`.
+Репозиторий содержит описание продукта, проектные спецификации, рабочий relay, desktop-daemon с PTY-мостом и shell-shims, а также проверенный базовый Expo SDK 54 workspace. Независимо разработанные desktop и relay соединены и проверены **воспроизводимым кросс-язык harness** (`npm run test:integration`, `tests/integration/desktop-relay-smoke.ts`): настоящий Python-демон против запущенного TS relay + mobile WebSocket-клиент проходят `register`/`pairing`/`session.list`/спаун сессии/`subscribe`/`session.input`→`terminal.output`. Это подтверждает совпадение контракта Zod↔Pydantic на живых сокетах. Expo scaffold проходит 52 core tests, 1 mobile component test, оба typecheck и Expo doctor 18/18; продуктовый mobile UI и реальный запуск на iPhone пока не подтверждены, а настоящий Claude/Codex/Cursor в интеграционном прогоне заменялся контролируемым `/bin/cat` за shim `claude`.
 
 ## Ограничения
 
-- мобильного UI пока нет; реальный desktop-daemon и relay проверены с техническим mobile-клиентом и управляемой PTY-сессией, но не с Expo-приложением и настоящим Claude/Codex/Cursor процессом;
+- mobile workspace и test harness готовы, но продуктового UI пока нет; реальный desktop-daemon и relay проверены с техническим mobile-клиентом и управляемой PTY-сессией, но не с Expo-приложением и настоящим Claude/Codex/Cursor процессом;
 - desktop-daemon пока без tray/GUI и без персистентности сессий в SQLite между рестартами;
 - daemon autostart/login item пока не устанавливается автоматически: текущий CLI setup все еще просит один раз запустить `cucoudle daemon`;
 - relay state остаётся in-memory: Compose переживает crash/reboot, но restart процесса сбрасывает pairing и mobile resume tokens;
 - automated deploy включается repository variable `RELAY_DEPLOY_ENABLED=true` только после добавления SSH/GHCR credentials в защищённое GitHub environment; bootstrap production container уже работает независимо от этого переключателя;
 - desktop endpoint пока не аутентифицируется device secret; end-to-end шифрование, ключи и ревокация устройств отложены;
 - запуск через Expo Go описан проектно и не подтверждён фактическим запуском на устройстве.
+- актуальный `npm audit` после Expo scaffold сообщает 14 moderate advisories в транзитивной цепочке Expo SDK 54; обновление до предлагаемого Expo 57 противоречит утверждённой совместимости с Expo Go SDK 54, поэтому это открытый блокер будущего zero-vulnerability gate;
 - `waiting` опционален: без desktop-side определения ожидания мобильный UI не пытается угадывать его по сырому терминальному тексту;
 - прямые действия `Разрешить` / `Отклонить` уже описаны target-контрактом и реализованы в TS/Zod + relay routing, но ещё требуют desktop bindings, capability negotiation и mobile controls; запуск сессии с телефона и семантическая лента действий всё ещё требуют будущих расширений;
 - красивый ANSI-рендеринг, code blocks, ссылки и полноценная эмуляция TUI не входят в мобильный MVP.
@@ -105,7 +107,7 @@ Cucoudle — мобильное приложение для удалённого
 
 1. TypeScript/Zod schemas для input modes и structured interactions и relay allowlist — сделано; осталось: capability offers/intersection (TS + relay) и Pydantic-зеркало на desktop.
 2. Добавить desktop key/bytes mapping и первый provider interaction adapter с stale-response protection.
-3. Выполнить `docs/superpowers/plans/2026-07-11-mobile-action-inbox-implementation.md`: scaffold Expo SDK 54, затем параллельные TDD-волны protocol/state/UI, pairing/Inbox/Sessions и Session/New/Settings/reconnect.
+3. Продолжить `docs/superpowers/plans/2026-07-11-mobile-action-inbox-implementation.md`: после завершённого Expo SDK 54 scaffold выполнить параллельные TDD-волны protocol/state/UI, pairing/Inbox/Sessions и Session/New/Settings/reconnect.
 4. После реализации capability negotiation включить в том же UI terminal keyboard, Approve/Reject, choices и text response с обязательным raw fallback; повторить полный E2E.
 5. Проверить настоящие Claude/Codex/Cursor prompts на macOS/Linux и iOS/Android.
 6. Добавить автоматическое desktop device enrollment и хранение credential в Keychain/Secret Service без пользовательской настройки.
