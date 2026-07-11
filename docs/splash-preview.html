@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cucoudle — варианты splash screen</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 48px 28px 72px;
+      color: #f4f7fa;
+      background: radial-gradient(circle at 50% -20%, #182840 0, #07111e 52%, #040811 100%);
+    }
+    header { max-width: 1120px; margin: 0 auto 34px; }
+    h1 { margin: 0 0 10px; font-size: clamp(28px, 4vw, 48px); }
+    header p { margin: 0; color: #9dabbc; font-size: 17px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(250px, 1fr));
+      gap: 24px;
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+    .card {
+      padding: 22px;
+      cursor: pointer;
+      border: 1px solid #26384d;
+      border-radius: 28px;
+      background: rgba(17, 30, 46, .82);
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    .card:hover { transform: translateY(-4px); border-color: #69afff; }
+    .card.selected { border-color: #74e8bd; box-shadow: 0 0 0 3px rgba(116,232,189,.16); }
+    .phone {
+      position: relative;
+      width: min(100%, 230px);
+      aspect-ratio: 9 / 19.5;
+      margin: 0 auto 20px;
+      overflow: hidden;
+      border: 7px solid #26303e;
+      border-radius: 38px;
+      background: #070b14;
+      box-shadow: 0 24px 56px rgba(0,0,0,.38);
+    }
+    .phone::before {
+      content: "";
+      position: absolute;
+      z-index: 2;
+      top: 0;
+      left: 50%;
+      width: 78px;
+      height: 20px;
+      border-radius: 0 0 14px 14px;
+      background: #26303e;
+      transform: translateX(-50%);
+    }
+    img { display: block; }
+    .a img { width: 82%; height: 82%; margin: 9% auto; object-fit: contain; }
+    .b img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.15); }
+    .c { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .c img { width: 74%; height: auto; object-fit: contain; }
+    .brand { margin-top: 18px; font-size: 25px; font-weight: 750; }
+    .tag { margin-top: 7px; color: #9dabbc; font-size: 8px; letter-spacing: 1.35px; }
+    h2 { margin: 0 0 8px; font-size: 21px; }
+    .description { margin: 0; color: #9dabbc; line-height: 1.5; }
+    .badge {
+      display: inline-block;
+      margin-left: 7px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      color: #062117;
+      background: #74e8bd;
+      font-size: 11px;
+      font-weight: 800;
+      vertical-align: 3px;
+    }
+    #choice { max-width: 1120px; min-height: 24px; margin: 26px auto 0; color: #74e8bd; font-weight: 700; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Splash screen Cucoudle</h1>
+    <p>Нажмите на вариант, чтобы выбрать его. Вариант A — рекомендуемый.</p>
+  </header>
+  <main class="grid">
+    <article class="card" data-choice="A">
+      <div class="phone a"><img src="file:///Users/launert/Documents/image.png" alt="Cucoudle"></div>
+      <h2>A · Полная иконка <span class="badge">Рекомендую</span></h2>
+      <p class="description">Вся композиция по центру на тёмном фоне, с безопасными полями.</p>
+    </article>
+    <article class="card" data-choice="B">
+      <div class="phone b"><img src="file:///Users/launert/Documents/image.png" alt="Cucoudle"></div>
+      <h2>B · Иммерсивный кадр</h2>
+      <p class="description">Иконка заполняет экран; края и часть мелких деталей обрезаются.</p>
+    </article>
+    <article class="card" data-choice="C">
+      <div class="phone c">
+        <img src="file:///Users/launert/Documents/image.png" alt="Cucoudle">
+        <div class="brand">Cucoudle</div>
+        <div class="tag">AI CODING AGENTS · ONE CHAT</div>
+      </div>
+      <h2>C · Иконка + подпись</h2>
+      <p class="description">Уменьшенная иллюстрация и отдельный текстовый брендовый блок.</p>
+    </article>
+  </main>
+  <p id="choice">Вариант пока не выбран</p>
+  <script>
+    const cards = document.querySelectorAll(".card");
+    const choice = document.querySelector("#choice");
+    cards.forEach((card) => card.addEventListener("click", () => {
+      cards.forEach((item) => item.classList.remove("selected"));
+      card.classList.add("selected");
+      choice.textContent = `Выбран вариант ${card.dataset.choice}`;
+    }));
+  </script>
+</body>
+</html>
