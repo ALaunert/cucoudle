@@ -197,3 +197,17 @@
 **Решения, ограничения и проблемы:** Terminal parity является универсальной гарантией, structured UI — provider-specific enhancement. Relay не интерпретирует approvals. Desktop показывает semantic action только при exact local response binding и отклоняет stale interaction. Новые schemas, daemon handling, relay allowlist и mobile UI еще не реализованы и явно отмечены как implementation gap.
 
 **Следующий шаг:** Реализовать shared schemas и relay allowlist, затем desktop key mapping/provider detector и mobile interaction controls отдельными зонами ответственности.
+
+## 2026-07-11 — Аудит server/mobile rollout и capability negotiation
+
+**Цель:** Проверить свежую interaction-спеку против фактических shared schemas и relay-кода и исключить включение неподдерживаемых controls на mobile.
+
+**Сделано:** Подтверждено, что `apps/mobile` отсутствует в общем `main`, а последний interaction commit менял только Markdown. Выявлен rollout gap: текущие Zod/Pydantic schemas, relay method/event allowlists и error codes еще не поддерживают новый target contract. Добавлен capability negotiation через desktop/mobile offers, `acceptedCapabilities` при register и per-mobile `negotiatedCapabilities` при pair/resume. Зафиксирована фильтрация interaction events и requests для разных mobile connections.
+
+**Затронутые компоненты:** Только target specs и актуальный implementation snapshot; runtime relay, desktop и mobile code не изменялись.
+
+**Проверки:** Фактические `packages/protocol/src/methods.ts`, `events.ts`, `envelope.ts` и `apps/relay/src/handlers.ts` сопоставлены с документацией. История commit `be08446` подтверждает отсутствие изменений `apps/mobile` и runtime backend. Backward-compatible baseline определен для клиентов без capability fields.
+
+**Решения, ограничения и проблемы:** Feature availability определяется пересечением mobile, relay и desktop, а не только общей protocol version. Negotiated set хранится per mobile connection. Текущий runtime остается baseline-only до отдельной реализации schemas, relay negotiation/allowlists, desktop mappings и mobile controls. Непубликованный mobile-код другого разработчика проверить из этой рабочей копии невозможно.
+
+**Следующий шаг:** Сначала реализовать capability negotiation и shared schemas у backend owner, затем передать mobile owner точный generated contract и только после этого включать interaction UI.

@@ -280,6 +280,7 @@ docs/*desktop*
 7. Подключить desktop daemon к relay.
 8. Расширить `session.input` режимами `text`, `raw`, `bytes`, `keys` и корректным mapping named keys/modifiers в PTY.
 9. Добавить provider-specific interaction detectors/bindings для approval, confirmation, choices и text prompts; хранить binding только на desktop и отклонять stale responses.
+10. Объявлять desktop capabilities в `desktop.register` и применять только negotiated input/interaction features.
 
 Готовность для MVP:
 
@@ -326,6 +327,7 @@ apps/mobile/
 8. Реализовать structured interaction state и `interaction.respond`: approval actions, single/multi select, text и cancel.
 9. Реализовать action buttons: interrupt, reconnect, clear local buffer.
 10. Добавить terminal keyboard accessory и доступ к raw terminal mode без скрытия transcript.
+11. Отправлять mobile capability offer при pair/resume и скрывать controls вне `negotiatedCapabilities`.
 
 Готовность для MVP:
 
@@ -354,6 +356,7 @@ docs/*protocol*
 - relay server;
 - shared protocol;
 - pairing flow;
+- capability negotiation между mobile, relay и desktop;
 - Android smoke tests;
 - Linux daemon smoke tests;
 - integration scripts for demo.
@@ -369,6 +372,7 @@ docs/*protocol*
 7. Проверить mobile app на Android.
 8. Проверить desktop daemon на Linux.
 9. Подготовить demo relay config.
+10. Расширить schemas/allowlists interaction messages и возвращать negotiated capabilities при pair/resume.
 
 Готовность для MVP:
 
@@ -439,6 +443,7 @@ Mobile принимает:
 - Structured interaction является optional enhancement конкретного provider adapter; terminal input остается обязательным fallback.
 - Approve/Reject нельзя строить по low-confidence text match. Desktop должен хранить exact response binding и проверять, что prompt не устарел.
 - Relay не интерпретирует choices и approvals, а только прозрачно форвардит contract messages.
+- Optional input/interaction features включаются только после capability negotiation; отсутствие поля означает baseline text/raw behavior.
 
 ## План реализации
 

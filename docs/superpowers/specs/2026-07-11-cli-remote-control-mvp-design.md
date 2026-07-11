@@ -88,6 +88,7 @@ Responsibilities:
 - forward text, raw bytes, named keys, interrupts, and resize events into the PTY;
 - detect supported Claude/Codex/Cursor prompts and bind structured interactions to exact PTY responses;
 - reject stale interaction responses rather than sending input to a newer prompt;
+- advertise desktop protocol capabilities during registration;
 - keep local session metadata and recent events in SQLite;
 - connect to the relay as the paired desktop device.
 
@@ -110,6 +111,7 @@ Responsibilities:
 - route messages between a mobile device and a desktop device;
 - track ephemeral presence;
 - emit clear errors for offline desktop, invalid pairing, and expired pairing.
+- negotiate the intersection of mobile, relay and desktop capabilities during pair/resume.
 
 For MVP, relay state can be in memory. If the relay restarts, active pairings and connections may be lost. Durable storage is a later concern.
 
@@ -121,6 +123,7 @@ Responsibilities:
 
 - pair with desktop by scanning QR or entering a code;
 - maintain relay WebSocket connection;
+- offer mobile capabilities and enable controls only from `negotiatedCapabilities`;
 - show a sessions list with agent, title, cwd, status, and last activity;
 - show a session detail screen with streaming terminal output;
 - render structured approvals, confirmations, choice lists and text prompts when desktop emits them;
@@ -139,7 +142,7 @@ Terminal parity and semantic UI are separate guarantees:
 
 ## Shared protocol
 
-All subsystems exchange typed JSON messages. The shared TypeScript protocol package owns event names and field names; the desktop side mirrors those models with Pydantic. `session.input` covers text/raw/bytes/keys. `interaction.requested`, `interaction.updated`, `interaction.respond`, and `interaction.resolved` cover native approval, choice and text UI. Detailed contracts are defined in `docs/protocol-contracts.md`.
+All subsystems exchange typed JSON messages. The shared TypeScript protocol package owns event names and field names; the desktop side mirrors those models with Pydantic. `session.input` covers text/raw/bytes/keys. `interaction.requested`, `interaction.updated`, `interaction.respond`, and `interaction.resolved` cover native approval, choice and text UI. Pair/resume returns the intersection of mobile, relay and desktop feature offers; unsupported controls remain hidden. Detailed contracts are defined in `docs/protocol-contracts.md`.
 
 Core session model:
 

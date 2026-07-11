@@ -108,6 +108,7 @@ export type ErrorCode =
   | "INVALID_MESSAGE"
   | "UNSUPPORTED_PROTOCOL"
   | "UNSUPPORTED_METHOD"
+  | "UNSUPPORTED_CAPABILITY"
   | "UNAUTHORIZED"
   | "PAIRING_EXPIRED"
   | "PAIRING_NOT_FOUND"
@@ -176,6 +177,48 @@ export type TerminalOutput = {
 
 `seq` is monotonically increasing per desktop daemon connection. Desktop uses it for reconnect and replay decisions.
 
+## Capability negotiation
+
+Protocol version compatibility is not enough to enable optional behavior. Mobile, relay and desktop negotiate additive capabilities during pairing/resume.
+
+```ts
+export type KnownProtocolCapability =
+  | "terminal.output.stream"
+  | "terminal.output.ansi"
+  | "terminal.output.alternateScreen"
+  | "terminal.input.text"
+  | "terminal.input.raw"
+  | "terminal.input.bytes"
+  | "terminal.input.keys"
+  | "terminal.resize"
+  | "session.interrupt"
+  | "interaction.structured"
+  | "interaction.reconnect";
+
+// Wire schemas accept any non-empty string for forward compatibility.
+export type ProtocolCapability = KnownProtocolCapability | (string & {});
+
+export type CapabilityOffer = {
+  capabilities: ProtocolCapability[];
+};
+```
+
+Rules:
+
+- Desktop sends its offer in `desktop.register.params.capabilities`.
+- Mobile sends its offer in `mobile.pair.params.capabilities` and `mobile.resume.params.capabilities`.
+- Relay has its own supported offer. `desktop.register` returns the desktop/relay intersection as `acceptedCapabilities`; pair/resume then returns the mobile/accepted-desktop intersection as `negotiatedCapabilities`.
+- Relay includes the same intersection in `mobile.paired` so desktop knows which events and payloads the connected mobile can consume.
+- Relay stores the negotiated set per mobile WebSocket connection, not only per desktop, because two paired phones may support different features.
+- Relay forwards `interaction.*` events only to mobile connections with `interaction.structured` and accepts `interaction.respond` only from such connections.
+- Desktop may keep detecting and storing an active interaction independently of mobile presence. Capability filtering affects delivery and controls, not the PTY state machine.
+- A feature must not be used unless it is present in `negotiatedCapabilities`.
+- Unknown capability strings are ignored, not rejected. Implementations intersect only capabilities they understand.
+- Missing capability fields mean baseline only: `terminal.output.stream`, `terminal.input.text`, `terminal.input.raw`, `terminal.resize`, and `session.interrupt`.
+- `interaction.structured` requires support from all three participants because relay must forward the method/events, desktop must own bindings, and mobile must render/respond safely.
+
+Capability names are additive. Removing or changing the meaning of a capability requires a protocol version bump.
+
 ## Backend <-> Mobile contract
 
 ### Mobile connect
@@ -197,7 +240,16 @@ Request:
       "id": "mob_abc",
       "name": "Sasha iPhone",
       "platform": "ios"
-    }
+    },
+    "capabilities": [
+      "terminal.output.stream",
+      "terminal.output.ansi",
+      "terminal.input.text",
+      "terminal.input.raw",
+      "terminal.input.keys",
+      "interaction.structured",
+      "interaction.reconnect"
+    ]
   },
   "sentAt": "2026-07-11T10:00:00Z"
 }
@@ -216,7 +268,12 @@ Success response:
     "desktopName": "MacBook Pro",
     "paired": true,
     "mobileSessionToken": "mst_dev_abc123",
-    "mobileSessionExpiresAt": "2026-07-11T18:00:01Z"
+    "mobileSessionExpiresAt": "2026-07-11T18:00:01Z",
+    "negotiatedCapabilities": [
+      "terminal.output.stream",
+      "terminal.input.text",
+      "terminal.input.raw"
+    ]
   },
   "sentAt": "2026-07-11T10:00:01Z"
 }
@@ -244,7 +301,15 @@ Request:
   "params": {
     "desktopId": "desk_123",
     "mobileDeviceId": "mob_abc",
-    "mobileSessionToken": "mst_dev_abc123"
+    "mobileSessionToken": "mst_dev_abc123",
+    "capabilities": [
+      "terminal.output.stream",
+      "terminal.input.text",
+      "terminal.input.raw",
+      "terminal.input.keys",
+      "interaction.structured",
+      "interaction.reconnect"
+    ]
   },
   "sentAt": "2026-07-11T10:10:00Z"
 }
@@ -261,7 +326,12 @@ Success response:
   "result": {
     "desktopId": "desk_123",
     "desktopName": "MacBook Pro",
-    "resumed": true
+    "resumed": true,
+    "negotiatedCapabilities": [
+      "terminal.output.stream",
+      "terminal.input.text",
+      "terminal.input.raw"
+    ]
   },
   "sentAt": "2026-07-11T10:10:00Z"
 }
@@ -450,7 +520,19 @@ Request:
     "desktopId": "desk_123",
     "desktopName": "MacBook Pro",
     "platform": "macos",
-    "appVersion": "0.1.0"
+    "appVersion": "0.1.0",
+    "capabilities": [
+      "terminal.output.stream",
+      "terminal.output.ansi",
+      "terminal.input.text",
+      "terminal.input.raw",
+      "terminal.input.bytes",
+      "terminal.input.keys",
+      "terminal.resize",
+      "session.interrupt",
+      "interaction.structured",
+      "interaction.reconnect"
+    ]
   },
   "sentAt": "2026-07-11T09:59:00Z"
 }
@@ -465,7 +547,14 @@ Response:
   "id": "req_d1",
   "ok": true,
   "result": {
-    "registered": true
+    "registered": true,
+    "acceptedCapabilities": [
+      "terminal.output.stream",
+      "terminal.input.text",
+      "terminal.input.raw",
+      "terminal.resize",
+      "session.interrupt"
+    ]
   },
   "sentAt": "2026-07-11T09:59:00Z"
 }
@@ -526,7 +615,12 @@ When `mobile.pair` succeeds, relay sends this event to the desktop connection. D
       "name": "Sasha iPhone",
       "platform": "ios"
     },
-    "mobileSessionExpiresAt": "2026-07-11T18:00:01Z"
+    "mobileSessionExpiresAt": "2026-07-11T18:00:01Z",
+    "negotiatedCapabilities": [
+      "terminal.output.stream",
+      "terminal.input.text",
+      "terminal.input.raw"
+    ]
   },
   "sentAt": "2026-07-11T10:00:01Z"
 }
@@ -934,6 +1028,9 @@ Structured controls must not hide or replace the terminal transcript. The user c
 - Removing fields or changing event names requires a protocol version bump.
 - Receivers should ignore unknown optional fields.
 - Senders should not require clients to understand fields that are not in this document.
+- Mobile renders only controls present in `negotiatedCapabilities`; unsupported structured interactions and key modes stay hidden while baseline text/raw terminal input remains available.
+- Relay or desktop returns `UNSUPPORTED_CAPABILITY` when a valid method/mode was not negotiated. Unknown method names still use `UNSUPPORTED_METHOD`.
+- Reconnect performs negotiation again. Mobile replaces, rather than unions, its previous capability set.
 
 ## Minimum demo contract
 
