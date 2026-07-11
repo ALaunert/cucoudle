@@ -169,3 +169,17 @@
 **Решения, ограничения и проблемы:** CI на GitHub Actions отложен: текущий токен без scope `workflow` не может публиковать `.github/workflows/*`, workflow-файл не заводим, чтобы не блокировать push. Reconnect остаётся best-effort: replay/snapshot по `seq` — ответственность десктопа.
 
 **Следующий шаг:** Вернуться к CI после расширения scope токена; по готовности mobile-приложения прогнать канал с реальным клиентом.
+
+## 2026-07-11 — Полный desktop → relay → mobile PTY smoke
+
+**Цель:** Проверить не только pairing, но и фактическое двустороннее управление живой desktop PTY-сессией через relay.
+
+**Сделано:** В изолированном `HOME` установлены реальные Cucoudle shims, при этом тестовый бинарь `claude` указывал на `/bin/cat`. Обычный запуск shim создал PTY-сессию в настоящем Python daemon. Технический WebSocket mobile-клиент через настоящий TypeScript relay выполнил pairing, `session.list`, `session.subscribe`, отправил `session.input`, получил `terminal.output`, затем отправил `session.interrupt` и получил `session.ended`.
+
+**Затронутые компоненты:** Runtime-код не менялся; обновлены только `docs/PROGRESS.md` и `docs/FINAL_IMPLEMENTATION.md` с фактическим результатом интеграционной проверки.
+
+**Проверки:** Mobile увидел одну running-сессию; строка `hello-from-mobile` была доставлена в PTY, появилась в relay event и в исходном локальном терминале; interrupt завершил процесс с `exitCode=-2`; desktop получил `mobile.paired` и `mobile.disconnected`. Relay и daemon после проверки штатно остановлены.
+
+**Решения, ограничения и проблемы:** Контракт и транспорт desktop↔relay совместимы без дополнительных правок. Проверялся весь управляющий путь, но агентский бинарь был детерминированным `/bin/cat`, а mobile UI — техническим WebSocket-клиентом. Настоящие Claude/Codex/Cursor и Expo-приложение остаются следующей проверкой.
+
+**Следующий шаг:** Повторить тот же сценарий из Expo mobile data layer, затем проверить настоящую Claude или Codex CLI-сессию.
