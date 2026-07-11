@@ -30,5 +30,14 @@ ws.on("message", (raw: Buffer) => {
     setTimeout(() => send({ kind: "request", id: "m4", method: "session.input", params: { sessionId: "sess_1", data: "hello from phone\n", inputMode: "text" } }), 2500);
   }
   if (m.kind === "event" && m.event === "terminal.output") process.stdout.write(m.data.data);
+  if (m.kind === "event" && m.event === "interaction.requested") {
+    const it = m.data.interaction;
+    console.log(`\n[interaction ${it.id}] ${it.prompt}`);
+    console.log("options:", it.options.map((o: { id: string; label: string }) => `${o.id} (${o.label})`).join(" | "));
+    const choice = process.env.INTERACTION_CHOICE ?? "approve_once";
+    console.log(`auto-responding with "${choice}"`);
+    send({ kind: "request", id: "ir1", method: "interaction.respond", params: { sessionId: it.sessionId, interactionId: it.id, response: { type: "options", optionIds: [choice] } } });
+  }
+  if (m.kind === "event" && m.event === "interaction.resolved") console.log("interaction resolved:", m.data.resolution, m.data.optionIds ?? "");
   if (m.kind === "event" && m.event === "session.ended") console.log("\nsession ended:", m.data.exitCode);
 });

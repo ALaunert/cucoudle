@@ -31,6 +31,28 @@ ws.on("message", (raw: Buffer) => {
       send({ kind: "event", event: "terminal.output", data: { sessionId: "sess_1", seq, data: `tick ${seq}\r\n` } });
       if (seq >= 5) clearInterval(timer);
     }, 1000);
+    // Simulate a Claude approval prompt so the interaction flow is testable without a real CLI.
+    setTimeout(() => {
+      seq += 1;
+      send({ kind: "event", event: "terminal.output", data: { sessionId: "sess_1", seq, data: "Allow Claude to run `npm test`? [y/n]\r\n" } });
+      send({ kind: "event", event: "interaction.requested", data: { interaction: {
+        id: "int_demo", sessionId: "sess_1", kind: "approval", prompt: "Allow Claude to run npm test?", details: "npm test",
+        options: [
+          { id: "approve_once", label: "Allow once", intent: "approveOnce" },
+          { id: "approve_session", label: "Allow for session", intent: "approveSession" },
+          { id: "reject", label: "Reject", intent: "reject" },
+        ],
+        allowsText: true, allowsTerminalInput: true, createdAt: new Date().toISOString(), terminalSeq: seq } } });
+    }, 2500);
+  }
+  if (m.kind === "request" && m.method === "interaction.respond") {
+    const r = m.params.response;
+    const picked = r.type === "options" ? r.optionIds.join(",") : r.type;
+    console.log("interaction response from mobile:", JSON.stringify(r));
+    send({ kind: "response", id: m.id, ok: true, result: { accepted: true } });
+    seq += 1;
+    send({ kind: "event", event: "terminal.output", data: { sessionId: "sess_1", seq, data: `> ${picked}\r\n` } });
+    send({ kind: "event", event: "interaction.resolved", data: { interactionId: m.params.interactionId, sessionId: m.params.sessionId, resolution: r.type === "cancel" ? "cancelled" : "answered", optionIds: r.type === "options" ? r.optionIds : undefined, resolvedAt: new Date().toISOString() } });
   }
   if (m.kind === "request" && m.method === "session.input") {
     console.log("input from mobile:", JSON.stringify(m.params.data));
