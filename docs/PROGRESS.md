@@ -743,7 +743,7 @@
 
 **Затронутые компоненты:** `apps/mobile/src/features/session/{SessionComposer.tsx,SessionScreen.tsx,InterruptButton.tsx,__tests__/SessionComposer.test.tsx,__tests__/SessionScreen.test.tsx}`, `apps/mobile/src/app/session/[id].tsx`, `docs/session-composer-mockups.html`, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
 
-**Проверки:** Новые regression tests сначала зафиксировали старую композицию (отдельные input/send и видимый «Прервать»), затем focused composer/session suites прошли 30/30. Полный mobile Jest — 26 suites, 168/168; mobile TypeScript typecheck — успешно; Expo Doctor — 18/18; `git diff --check` — успешно.
+**Проверки:** Новые regression tests сначала зафиксировали старую композицию (отдельные input/send и видимый «Прервать»), затем focused composer/session suites прошли 30/30. После rebase поверх structured-interactions полный mobile Jest — 26 suites, 170/170; mobile TypeScript typecheck — успешно; Expo Doctor — 18/18; `git diff --check` — успешно.
 
 **Решения, ограничения и проблемы:** Interrupt удалён только из пользовательского экрана, поэтому wire-контракт и runtime API остаются совместимыми и действие можно вернуть в более подходящем overflow/menu сценарии. Фактическая композиция с длинным multiline-текстом и системной клавиатурой ещё не проверена на физическом устройстве после этой правки.
 
