@@ -280,3 +280,16 @@
 **Решения, ограничения и проблемы:** Требует запущенного relay и Python с зависимостями демона; поэтому вынесено из `npm test`. `requires-python>=3.11` в pyproject, но пакет запускается и на 3.10 (3.11-only конструкций нет). Проверялся базовый demo-контракт; структурные интеракции в этом harness пока не гоняются, т.к. Pydantic-зеркало интеракций на desktop ещё не готово.
 
 **Следующий шаг:** После синхронизации Pydantic-схем интеракций расширить harness на `interaction.requested`→`interaction.respond`→`interaction.resolved`; при желании — прогон против публичного relay через `RELAY_WS`.
+## 2026-07-11 — План реализации мобильного Action Inbox
+
+**Цель:** Превратить утверждённую UI-спецификацию в исполнимый TDD-план, допускающий безопасную параллельную работу нескольких агентов напрямую в `main`.
+
+**Сделано:** Подготовлен план из 14 задач. После последовательного Expo scaffold идут три параллельные волны: protocol/state/UI foundations; pairing/Inbox/Sessions; Session detail/New+Settings/reconnect. После каждой волны оркестратор выполняет интеграционный checkpoint, полный test/typecheck/audit gate, обновляет документы и делает единый commit/push. Для каждого поведения предусмотрены failing test, подтверждение red, минимальная реализация и green-проверка. Физический iPhone smoke вынесен в финальную последовательную задачу.
+
+**Затронутые компоненты:** `docs/superpowers/plans/2026-07-11-mobile-action-inbox-implementation.md`, `docs/PROGRESS.md`, `docs/FINAL_IMPLEMENTATION.md`.
+
+**Проверки:** План прошёл трёхитерационный независимый review-loop; исправлены trailing newline для desktop baseline, владелец recovery UI, явный red-run AppProvider, точная runtime composition и LAN-доступный `RELAY_MOBILE_URL`; финальный reviewer status — `Approved`. `git diff --check` — успешно.
+
+**Решения, ограничения и проблемы:** Для запуска на физическом Expo Go выбран SDK 54. Mobile component tests планируются на Jest/`jest-expo` + React Native Testing Library, а существующие protocol/relay tests остаются на Vitest. Параллельные lane-агенты не выполняют Git-операции в общей рабочей копии; commit/push делает только оркестратор на wave boundary. Реализация mobile-кода ещё не начата.
+
+**Следующий шаг:** Выполнить Task 1 плана — scaffold `apps/mobile`, mobile test harness и первый проверенный запуск Expo Go.

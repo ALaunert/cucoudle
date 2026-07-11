@@ -74,6 +74,8 @@ Cucoudle — мобильное приложение для удалённого
 - если удалённая ветка ушла вперёд, применяется `git pull --rebase origin main` с самостоятельным разрешением конфликтов и повторными проверками;
 - force-push и переписывание опубликованной истории `main` запрещены;
 - каждый значимый инкремент одновременно обновляет хронологический прогресс и этот актуальный снимок реализации.
+- для Expo `Action Inbox` подготовлен подробный TDD-план из 14 задач: после последовательного scaffold предусмотрены три параллельные волны с непересекающимся владением файлами и последовательным integration checkpoint после каждой;
+- параллельные mobile-исполнители не меняют Git index, а оркестратор проверяет общий результат, обновляет документы, коммитит и отправляет завершённую волну напрямую в `main`.
 
 ## Текущее проверенное состояние
 
@@ -100,7 +102,7 @@ Cucoudle — мобильное приложение для удалённого
 
 1. TypeScript/Zod schemas для input modes и structured interactions и relay allowlist — сделано; осталось: capability offers/intersection (TS + relay) и Pydantic-зеркало на desktop.
 2. Добавить desktop key/bytes mapping и первый provider interaction adapter с stale-response protection.
-3. Составить план и реализовать утверждённый Expo UI `Action Inbox`: pairing, четыре вкладки, status-derived inbox, список сессий, детальный экран с простым терминальным выводом, composer, interrupt и reconnect поверх baseline `@cucoudle/protocol`.
+3. Выполнить `docs/superpowers/plans/2026-07-11-mobile-action-inbox-implementation.md`: scaffold Expo SDK 54, затем параллельные TDD-волны protocol/state/UI, pairing/Inbox/Sessions и Session/New/Settings/reconnect.
 4. После реализации capability negotiation включить в том же UI terminal keyboard, Approve/Reject, choices и text response с обязательным raw fallback; повторить полный E2E.
 5. Проверить настоящие Claude/Codex/Cursor prompts на macOS/Linux и iOS/Android.
 6. Добавить автоматическое desktop device enrollment и хранение credential в Keychain/Secret Service без пользовательской настройки.
